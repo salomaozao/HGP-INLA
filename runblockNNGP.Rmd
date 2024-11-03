@@ -40,35 +40,35 @@ dir.save = getwd()
 
 
 ## simulate data
+set.seed(1)
 n 	<- 2500
-
-
-
-
 loc 	<- cbind(runif(n,0,1), runif(n,0,1))
-
 
 sigma.sq <- 1
 tau.sq	 <- 0.1
-nu 	 <- 0.5
 phi 	 <- 3
-range    <- sqrt(8 * nu) / phi #!
+
+nu 	 <- 0.5
+alpha = 1
+
+#range    <-  log(10)^(1/alpha) * phi
+range    <- sqrt(8 * nu) / phi
+
+D 	 <- as.matrix(dist(loc))
 ```
 
 ```{r}
 ##Matern##
-D 	 <- as.matrix(dist(loc))
-R 	 <- (D*phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=D*phi, nu=nu)
-diag(R)  <- 1
+#R 	 <- (D*phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=D*phi, nu=nu)
 ```
 
 ```{r}
 ##PowExp##
-
-
+R <- exp((-1) * (D/phi)^alpha)
 ```
 
 ```{r}
+diag(R)  <- 1
 nloc 	 <- dim(loc)[1]
 
 C 	 <- sigma.sq*R
@@ -94,7 +94,7 @@ case='regular'
 n.partition 	<- 8
 n.blocks    	<- n.partition^2
 #number of neigbhor blocks
-num.nb 	<- 2
+num.nb 	<- 10
 res1 	 	<- blockNNGP_reg(case, loc,  y, X, w,  dir.save, n.blocks, num.nb)
 summary(res1)
-{r}
+```
