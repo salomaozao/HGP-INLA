@@ -51,20 +51,20 @@ phi 	 <- 3
 nu 	 <- 0.5
 alpha = 1
 
-#range    <-  log(10)^(1/alpha) * phi
-range    <- sqrt(8 * nu) / phi
+range    <-  log(10)^(1/alpha) * phi
+#range    <- sqrt(8 * nu) / phi
 
 D 	 <- as.matrix(dist(loc))
 ```
 
 ```{r}
 ##Matern##
-#R 	 <- (D*phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=D*phi, nu=nu)
+R 	 <- (D*phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=D*phi, nu=nu)
 ```
 
 ```{r}
 ##PowExp##
-R <- exp((-1) * (D/phi)^alpha)
+#R <- exp((-1) * (D/phi)^alpha)
 ```
 
 ```{r}
