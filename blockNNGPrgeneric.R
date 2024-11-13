@@ -89,15 +89,15 @@
     ###########
     ## Matérn
     ###########
-    nu<- 0.5
-    R <- (coords.D*param$phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=coords.D*param$phi, nu=nu)
+    # R <- (coords.D*param$phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=coords.D*param$phi, nu=nu)
+    # nu<- 0.5
 
     
     ###########
     ## PowExp
     ###########
-    nu<- 1
-    R <- (coords.D*param$phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=coords.D*param$phi, nu=nu)
+    alpha <- 1
+    R <- exp((-1) * (D/phi)^alpha)
 
 
     diag(R) <- 1
