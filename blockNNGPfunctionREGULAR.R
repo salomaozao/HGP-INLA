@@ -139,7 +139,7 @@ indb[[k]] <- util.index(k+1,blocks,AdjMatrix,newindex)
 
 ## mask for precision-blockNNGP
 coords.D 	<- rdist(loc)
-C1 <-  exp(-0.04*coords.D)
+C1 <-  exp(-0.04*coords.D)  # !
 invC   <-  PrecblockNNGP(n, n.blocks,C1,nb,ind_obs1,num1,indb)
 invCsp <- as.matrix(invC)
 invCsp[which(invC>0)] <- 1

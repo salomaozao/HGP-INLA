@@ -51,20 +51,20 @@ phi 	 <- 3
 nu 	 <- 0.5
 alpha = 1
 
-range    <-  log(10)^(1/alpha) * phi  #  = 3
-#range    <- sqrt(8 * nu) / phi  #  = 0.66
+range    <-  log(10)^(1/alpha) * phi  
+range1    <- sqrt(8 * nu) / phi 
 
 D 	 <- as.matrix(dist(loc))
 ```
 
 ```{r}
 ##Matern##
-# R 	 <- (D*phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=D*phi, nu=nu)
+R 	 <- (sqrt(2*nu)*D/phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=sqrt(2*nu)*D/phi, nu=nu)
 ```
 
 ```{r}
 ##PowExp##
-R <- exp((-1) * (D/phi)^alpha)
+R2 <- exp((-1) * (D/phi)^alpha)
 ```
 
 ```{r}
@@ -93,7 +93,7 @@ case='regular'
 n.partition 	<- 8
 n.blocks    	<- n.partition^2
 #number of neigbhor blocks
-num.nb 	<- 10
+num.nb 	<- 2
 res1 	 	<- blockNNGP_reg(case, loc,  y, X, w,  dir.save, n.blocks, num.nb)
 summary(res1)
 ```
