@@ -175,7 +175,7 @@ resf <- inla(f.blockNNGP, data = as.data.frame(data1), family = "gaussian")
 # It depends on the internal representation of the hyperparameters.
 tau.est 	<- 1/resf$summary.hyperpar$mean[1]
 sigmasq.est 	<- exp(-resf$summary.hyperpar$mean[2])
-phi.est = 30 - (29)/ (1 + exp(resf$summary.hyperpar$mean[3]))
+phi.est = 1 - 1/(1 + exp(resf$summary.hyperpar$mean[3]))
 summary.theta 	<- c(tau.est, sigmasq.est, phi.est)
 
 summary.theta <- c(tau.est,sigmasq.est,phi.est)

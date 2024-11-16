@@ -26,7 +26,7 @@
     return(
       list(
         sigmasq = exp(-theta[1L]),
-        phi = 30 - (29) / (1 + exp(theta[2L]))
+        phi = 1 - (1) / (1 + exp(theta[2L]))
       ) # b - (b-a)/(1+exp(theta2))
     )
   }
@@ -121,10 +121,9 @@
   # log.prior function computes the pdf of prior distributions for sigmasq and phi. In particular, for the marginal variance we set a gamma distribution  with parameters 1 and 0.00005,and for phi=2/range we set a uniform distribution on (a,b), where a and b are associated to the minimum and maximum distance between locations, in this case a=1 and b=30. extra terms that appear in the definition of the log-density of the prior are due to the change of variable involved. INLA works with (theta1, theta2)  internally, but the prior is set on (sigmasq, phi).
   log.prior <- function() {
     param <- interpret.theta()
-    a <- 1
-    b <- 30
     res <- dgamma(param$sigmasq, 1, 5e-05, log = TRUE) + log(param$sigmasq) +
-       (2*log(1/(29))) + log(param$phi-1) + log(30 - param$phi)
+       #(2*log(1/1)) + log(param$phi-1) + log(30 - param$phi)
+       log(param$phi) + log(1 - param$phi)
     return(res)
   }
 
