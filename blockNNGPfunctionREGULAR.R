@@ -173,9 +173,9 @@ resf <- inla(f.blockNNGP, data = as.data.frame(data1), family = "gaussian")
 
 # Recovering the posterior mean estimation of nugget, marginal variance and phi parameters.
 # It depends on the internal representation of the hyperparameters.
-tau.est 	<- 1/resf$summary.hyperpar$mean[1]
-sigmasq.est 	<- exp(-resf$summary.hyperpar$mean[2])
-phi.est = 1 - 1/(1 + exp(resf$summary.hyperpar$mean[3]))
+tau.est 	<- inla.emarginal(foo <-function(x){1/x},resf$marginals.hyperpar[[1]])
+sigmasq.est 	<- inla.emarginal(foo <-function(x){exp(-x)},resf$marginals.hyperpar[[2]])
+phi.est = inla.emarginal(foo <-function(x){1 - 1/(1 + exp(x))},resf$marginals.hyperpar[[3]]) 
 summary.theta 	<- c(tau.est, sigmasq.est, phi.est)
 
 summary.theta <- c(tau.est,sigmasq.est,phi.est)

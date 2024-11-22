@@ -2,7 +2,7 @@
 rm(list=ls())
 
 
-setwd("/Users/User/Documents/Gabriel/IC/blockNNGP-main/blockNNGP-main/SimulationStudy/Gaussian_example/")
+setwd("C:/Users/Gabriel/Documents/Gabriel/IC/Gaussian_example/")
 
 
 #######################
@@ -40,8 +40,8 @@ dir.save = getwd()
 
 
 ## simulate data
-set.seed(1)
-n 	<- 2500
+set.seed(1232)
+n 	<- 1000
 loc 	<- cbind(runif(n,0,1), runif(n,0,1))
 
 sigma.sq <- 1
@@ -52,66 +52,48 @@ nu 	 <- 0.5
 alpha = 1
 
 range    <-  log(10)^(1/alpha) * phi  
-range1    <- sqrt(8 * nu) / phi 
+range1    <- sqrt(8 * nu) * phi 
 
 D 	 <- as.matrix(dist(loc))
 ```
 
 ```{r}
-## NNGP parameters
+##Matern##
+R 	 <- (sqrt(2*nu)*D/phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=sqrt(2*nu)*D/phi, nu=nu)
+```
+
+```{r}
+##PowExp##
+R <- exp((-1) * (D/phi)^alpha)
+```
+
+```{r}
+diag(R)  <- 1
+nloc 	 <- dim(loc)[1]
+C 	 <- sigma.sq*R
+
+D 	 	<- chol(C)
+rnorm_n.obs 	<- rnorm(n)
+w 		<- t(matrix(rnorm_n.obs, ncol=(n))%*%D )
+
+X 		<- as.matrix(cbind(1, rnorm(nloc))) ## X = intercept + covariate
+
+B 		<- as.matrix(c(1,5))
+p 		<- length(B)
+
+y 		<- rnorm(nloc, X%*%B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
+
+```
+
+```{r}
 case='regular'
+
 
 #number of blocks (n.partition=8 ---> n.blocks= 8^2 = 64 blocks)
 n.partition 	<- 8
 n.blocks    	<- n.partition^2
 #number of neigbhor blocks
 num.nb 	<- 2
+res1 	 	<- blockNNGP_reg(case, loc,  y, X, w,  dir.save, n.blocks, num.nb)
+summary(res1)
 ```
-
-
-```{r}
-##PowExp##
-R_powexp <- exp((-1) * (D/phi)^alpha)
-
-diag(R_powexp)  <- 1
-nloc 	 <- dim(loc)[1]
-C_powexp 	     <- sigma.sq*R_powexp
-D_powexp 	   	 <- chol(C_powexp)
-
-rnorm_n.obs 	<- rnorm(n)
-w_powexp 		<- t(matrix(rnorm_n.obs, ncol=(n))%*%D_powexp )
-X_powexp 		<- as.matrix(cbind(1, rnorm(nloc))) ## X = intercept + covariate
-
-
-B 		<- as.matrix(c(1,5))
-p 		<- length(B)
-
-y_powexp 		<- rnorm(nloc, X_powexp%*%B + w_powexp, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
-
-res_powexp 	 	<- blockNNGP_reg(case, loc,  y_powexp, X_powexp, w_powexp,  dir.save, n.blocks, num.nb)
-summary(res_powexp)
-```
-
-```{r}
-##Matern##
-R_matern 	 <- (sqrt(2*nu)*D/phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=sqrt(2*nu)*D/phi, nu=nu)
-
-diag(R_matern)  <- 1
-nloc 	 <- dim(loc)[1]
-C_matern 	     <- sigma.sq*R_matern
-D_matern 	   	 <- chol(C_matern)
-
-rnorm_n.obs 	<- rnorm(n)
-w_matern 		<- t(matrix(rnorm_n.obs, ncol=(n))%*%D_matern )
-X_matern 		<- as.matrix(cbind(1, rnorm(nloc))) ## X = intercept + covariate
-
-
-B 		<- as.matrix(c(1,5))
-p 		<- length(B)
-
-y_matern 		<- rnorm(nloc, X_matern%*%B + w_matern, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
-
-res_matern 	 	<- blockNNGP_reg(case, loc,  y_matern, X_matern, w_matern,  dir.save, n.blocks, num.nb)
-summary(res_matern)
-```
-
