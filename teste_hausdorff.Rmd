@@ -1,0 +1,30 @@
+```{r}
+library(sf)
+ 
+## simulate data
+set.seed(1232)
+n 	<- 100
+loc 	<- cbind(runif(n,0,1), runif(n,0,1))  # n linhas com duas colunas lon, lat
+```
+
+
+```{r}
+hdist = function(locMatrix) {
+  ptsVec <- list() 
+  for (i in 1:n) {
+      ptsVec[[i]] <- st_point(c(locMatrix[i, 1], locMatrix[i, 2]))  
+    }
+
+    # 2. fazer uma matriz de distância(i, j)
+    distMatrix <- matrix(0, nrow = n, ncol = n)
+
+    for (i in 1:n) {
+      for (j in 1:n) {
+      distMatrix[i, j] <- st_distance(ptsVec[[i]], ptsVec[[j]], which = "Hausdorff")
+      }
+  }
+
+  return(distMatrix)
+}
+```
+

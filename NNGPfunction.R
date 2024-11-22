@@ -67,7 +67,7 @@ if (j > num.nb+1){
 
 
 g1 = graph.adjacency(AdjMatrix, mode='directed')
-is.dag(g1)
+is_dag(g1)
 
 
 
