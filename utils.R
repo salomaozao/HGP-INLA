@@ -112,3 +112,27 @@ Prec_NNGP  = function(loc,AdjMatrix,Sigma){
 }
 
 
+
+
+hdist = function(locMatrix) {
+  nrow <- nrow(locMatrix)
+  ptsVec <- list() 
+
+  if (ncol(locMatrix) < 2) {
+    stop("locMatrix must have at least two columns")
+  }
+
+  for (i in 1:nrow) {
+    ptsVec[[i]] <- st_point(c(locMatrix[i, 1], locMatrix[i, 2]))  
+  }
+
+  # 2. fazer uma matriz de distância(i, j)
+  distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
+
+  for (i in 1:nrow) {
+    for (j in 1:nrow) {
+    distMatrix[i, j] <- st_distance(ptsVec[[i]], ptsVec[[j]], which = "Hausdorff")
+    }
+  }
+  return(distMatrix)
+}
