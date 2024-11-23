@@ -98,7 +98,7 @@ AdjMatrix
 
 
 g1 = graph.adjacency(AdjMatrix, mode='directed')
-is.dag(g1)
+is_dag(g1)
 
 
 ## to make things simple reorder loc respect to the blocks
@@ -115,20 +115,20 @@ print(paste("approx points per block is" , meanloc))
 
 
 ### needed indexes to built the precision matrix of block_NNGP
-  newindex     <- NULL
-  nb           <- matrix(NA,n.blocks,1)
-  nb[1]        <- length(which(blocks==1))
-  for (j in 1:n.blocks){
-    ind_obs      <- which(blocks==j)
-    newindex     <- c(newindex,ind_obs)
-    if(j>1){
-    nbj=length(ind_obs)
-    nb[j] <- nb[j-1]+nbj
-    }
+newindex     <- NULL
+nb           <- matrix(NA,n.blocks,1)
+nb[1]        <- length(which(blocks==1))
+for (j in 1:n.blocks){
+  ind_obs      <- which(blocks==j)
+  newindex     <- c(newindex,ind_obs)
+  if(j>1){
+  nbj=length(ind_obs)
+  nb[j] <- nb[j-1]+nbj
   }
-  nloc         <- dim(loc)[1]
-  ind_obs1      <- which(blocks==1)
-  num1          <- seq(1:length(ind_obs1))
+}
+nloc         <- dim(loc)[1]
+ind_obs1      <- which(blocks==1)
+num1          <- seq(1:length(ind_obs1))
 
 
 indb <- NULL
@@ -139,7 +139,13 @@ indb[[k]] <- util.index(k+1,blocks,AdjMatrix,newindex)
 
 ## mask for precision-blockNNGP
 coords.D 	<- rdist(loc)
+print(coords.D)
+print("--------------------")
+  
 C1 <-  exp(-0.04*coords.D)  # !
+print("--------------------")
+print(C1)
+  
 invC   <-  PrecblockNNGP(n, n.blocks,C1,nb,ind_obs1,num1,indb)
 invCsp <- as.matrix(invC)
 invCsp[which(invC>0)] <- 1

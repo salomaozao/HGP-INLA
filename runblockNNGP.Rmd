@@ -34,6 +34,7 @@ library(ggforce)
 library(Rcpp)
 library(tidyverse)
 library(raster)
+library(sf)
 
 
 dir.save = getwd()
@@ -58,16 +59,9 @@ D 	 <- as.matrix(dist(loc))
 ```
 
 ```{r}
-##Matern##
-R 	 <- (sqrt(2*nu)*D/phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=sqrt(2*nu)*D/phi, nu=nu)
-```
-
-```{r}
 ##PowExp##
 R <- exp((-1) * (D/phi)^alpha)
-```
 
-```{r}
 diag(R)  <- 1
 nloc 	 <- dim(loc)[1]
 C 	 <- sigma.sq*R

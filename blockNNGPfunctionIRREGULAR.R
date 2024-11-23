@@ -117,7 +117,7 @@ AdjMatrix
 
 
 g1 = graph.adjacency(AdjMatrix, mode = 'directed')
-is.dag(g1)
+is_dag(g1)
 
 
 ind1 	<- sort.int(blocks, index.return = TRUE)
