@@ -97,9 +97,10 @@ x1		<- newf.locblocks[ , 1]
 x2		<- newf.locblocks[ , 2]
 
 
-
 sortloc 	<- cbind(x1, x2)
-dist.mat 	<- rdist(sortloc)
+print("nngpfuncirreg:100 start")
+dist.mat 	<- hdist(sortloc)
+print("nngpfuncirreg:100 end")
 AdjMatrix 	<-  matrix(0, n.blocks, n.blocks)
 AdjMatrix[1,1] 	<-0
 
@@ -152,7 +153,9 @@ indb[[k]] <- util.index(k+1, blocks, AdjMatrix, newindex)
 
 
 ## mask for precision-blockNNGP
-coords.D 	<- rdist(loc)
+print("nngpfuncirreg:155 start")
+coords.D 	<- hdist(loc)
+print("nngpfuncirreg:155 end")
 C1 <-  exp(-0.04*coords.D)
 invC   <-  PrecblockNNGP(n, n.blocks,C1,nb,ind_obs1,num1,indb)
 invCsp <- as.matrix(invC)

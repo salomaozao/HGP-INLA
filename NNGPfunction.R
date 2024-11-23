@@ -49,7 +49,8 @@ x1 <- loc[indexsort,1]
 
 
 sortloc <- cbind(x1, x2)
-dist.mat <- rdist(sortloc)
+print("nngpfun:52")
+dist.mat <- hdist(sortloc)
 
 AdjMatrix <-  matrix(0, nloc, nloc)
 AdjMatrix[1,1] <-0
@@ -86,7 +87,8 @@ Y=y
 coords=loc
 
 ## mask for precision-NNGP
-coords.D 	<- rdist(loc)
+print("nngpfun:90")
+coords.D 	<- hdist(loc)
 C1 <- 0.04 *exp(-phi*coords.D)
 invC   <-  Prec_NNGP(coords,AdjMatrix,C1) 
 invCsp <- as.matrix(invC)

@@ -120,42 +120,48 @@ hdist = function(locMatrix) {
   if (ncol(locMatrix) < 2) {
     stop("locMatrix must have at least two columns")
   }
-
+  print("transformando em vetor st_point")
   for (i in 1:nrow) {
     ptsVec[[i]] <- st_point(c(locMatrix[i, 1], locMatrix[i, 2]))  
   }
-
+  print("OK!")
+  
   # 2. fazer uma matriz de distância(i, j)
   distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
-
+  cat("Calculando matriz distância, n=", nrow, "\n")
   for (i in 1:nrow) {
+    if (i%%10 == 0)       {print(i)}
     for (j in 1:nrow) {
-    distMatrix[i, j] <- st_distance(ptsVec[[i]], ptsVec[[j]], which = "Hausdorff")
+      dist = st_distance(ptsVec[[i]], ptsVec[[j]], which = "Hausdorff")
+      distMatrix[i, j] <- dist
     }
   }
+  print("OK!")
   return(distMatrix)
 }
 
-
-hdist = function(locMatrix) {
+hdist_opt <- function(locMatrix) {
   nrow <- nrow(locMatrix)
-  ptsVec <- list() 
-
   if (ncol(locMatrix) < 2) {
     stop("locMatrix must have at least two columns")
   }
+  
+  # Vetor de pontos
+  ptsVec <- lapply(1:nrow, function(i) st_point(c(locMatrix[i, 1], locMatrix[i, 2])))
 
-  for (i in 1:nrow) {
-    ptsVec[[i]] <- st_point(c(locMatrix[i, 1], locMatrix[i, 2]))  
-  }
-
-  # 2. fazer uma matriz de distância(i, j)
+  # Matriz de distância (inicializa com zeros)
   distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
-
-  for (i in 1:nrow) {
-    for (j in 1:nrow) {
-    distMatrix[i, j] <- st_distance(ptsVec[[i]], ptsVec[[j]], which = "Hausdorff")
+  
+  cat("Calculando matriz triangular de distâncias de Hausdorff, n =", nrow, "\n")
+  for (i in 1:(nrow - 1)) { 
+    if (i %% 10 == 0) { print(paste("Linha", i)) }
+    for (j in (i + 1):nrow) { 
+      dist <- st_distance(ptsVec[[i]], ptsVec[[j]], which = "Hausdorff")
+      distMatrix[i, j] <- dist 
+      distMatrix[j, i] <- dist 
     }
   }
+  
+  print("Matriz de distâncias calculada com sucesso!")
   return(distMatrix)
 }

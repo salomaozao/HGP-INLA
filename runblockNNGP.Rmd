@@ -1,3 +1,6 @@
+- Código não roda com n pequeno
+- hdist muito devagar
+
 ```{r}
 rm(list=ls())
 
@@ -90,4 +93,18 @@ n.blocks    	<- n.partition^2
 num.nb 	<- 2
 res1 	 	<- blockNNGP_reg(case, loc,  y, X, w,  dir.save, n.blocks, num.nb)
 summary(res1)
+```
+
+```{r}
+
+case='irregular'
+
+
+#number of blocks (nexp=7 ---> n.blocks=2^7)
+nexp 	 <- 7
+n.blocks <- 2^nexp
+#number of neigbhor blocks
+num.nb   <- 2
+res2	 <- blockNNGP(case, loc,  y, X, w, dir.save, n.blocks, num.nb)
+summary(res2)
 ```
