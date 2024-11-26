@@ -21,7 +21,7 @@
 ##      ‘inla’ returns an object of class ‘"inla"’.
 ##
 
-blockNNGP = function(case="irregular", loc,  y, X, w.obs , dir.save, n.partition, num.nb){
+blockNNGP = function(case="irregular", loc,  y, X, w.obs , dir.save, n.blocks, num.nb){
 
 ###%%%%%%%%%%%%%%%%%%%%%%% START %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## The next codes implement the Adjacency matrix of blockNNGP and objects that the
@@ -41,7 +41,6 @@ file1 	<- paste('/case',case,'_',nloc,'_',n.blocks,'_',num.nb,sep="")
 png(paste(dir.save,'/case',case,'_',nloc,'_',n.blocks,'_',num.nb,"_NNGPblocks1_new.png",sep=""))
 loc.blocks<- matrix(NA, n.blocks, 2)
 nb 	<- NULL
-plot(loc,  main= paste('M = ',n.blocks), pch='.')
 for(k in 1:n.blocks){
 	indblock 	<- which(blocks==k)
 	nb	 	<- c(nb, length(indblock))
@@ -50,7 +49,6 @@ for(k in 1:n.blocks){
 	points(loc[indblock,1:2],col=k,pch=19)
 	text(loc[indblock,1]+0.01, loc[indblock,2], k, col='red', cex=0.8)
 	}
-dev.off()
 
 
 #########################################################
@@ -78,7 +76,18 @@ if(n.blocks == 128 ) indr = 16
 
 blocksr 	<- 1:n.blocks
 indexsort1	<- NULL
+  
+# O número de linhas de new.locblocks deve ser igual ao número de blocos (n.blocks). OK
+print(nrow(new.locblocks))
+print(n.blocks)
+print("PORRA")
+
+
+
+
 for(j in 1: (n.blocks/indr)){
+  print("a")
+  print((((j-1)*indr)+1):(j*indr))
 	h1 		<- new.locblocks[(((j-1)*indr)+1):(j*indr), ]
 	indh1 		<- sort.int(h1[,1], index.return = TRUE)
 	indexsort1 	<- c(indexsort1, indh1$ix+ ((j-1)*indr))
@@ -191,9 +200,9 @@ resf <- inla(f.blockNNGP, data = as.data.frame(data1), family = "gaussian")
 
 # Recovering the posterior mean estimation of nugget, marginal variance and phi parameters.
 # It depends on the internal representation of the hyperparameters.
-tau.est 	<- 1/resf$summary.hyperpar$mean[1]
-sigmasq.est 	<- exp(resf$summary.hyperpar$mean[2])
-phi.est = 30 - (29)/ (1 + exp(resf$summary.hyperpar$mean[3]))
+tau.est 	<- inla.emarginal(foo <-function(x){1/x},resf$marginals.hyperpar[[1]])
+sigmasq.est 	<- inla.emarginal(foo <-function(x){exp(-x)},resf$marginals.hyperpar[[2]])
+phi.est = inla.emarginal(foo <-function(x){1 - 1/(1 + exp(x))},resf$marginals.hyperpar[[3]]) 
 summary.theta 	<- c(tau.est, sigmasq.est, phi.est)
 print( c("tau.est","sigmasq.est","phi.est"))
 print(summary.theta)
