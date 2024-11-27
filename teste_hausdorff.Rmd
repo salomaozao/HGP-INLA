@@ -1,30 +1,81 @@
 ```{r}
-library(sf)
- 
-## simulate data
-set.seed(1232)
-n 	<- 100
-loc 	<- cbind(runif(n,0,1), runif(n,0,1))  # n linhas com duas colunas lon, lat
-```
-
-
-```{r}
-hdist = function(locMatrix) {
-  ptsVec <- list() 
-  for (i in 1:n) {
-      ptsVec[[i]] <- st_point(c(locMatrix[i, 1], locMatrix[i, 2]))  
-    }
-
-    # 2. fazer uma matriz de distância(i, j)
-    distMatrix <- matrix(0, nrow = n, ncol = n)
-
-    for (i in 1:n) {
-      for (j in 1:n) {
-      distMatrix[i, j] <- st_distance(ptsVec[[i]], ptsVec[[j]], which = "Hausdorff")
-      }
-  }
-
+hdist_sf <- function(locVec) {
   return(distMatrix)
 }
 ```
 
+```{r}
+library(CARBayesdata)
+data(GGHB.IZ)
+data(respiratorydata) # dados usados pelo Lucas
+
+
+locVec <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]
+# loc = st_coordinates(st_centroid(loc_sf))
+
+nrow <- nrow(locVec)
+distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
+print(nrow)
+
+
+cat("Calculando matriz triangular de distâncias de Hausdorff, n =", nrow, "\n")
+for (i in 1:(nrow - 1)) {
+  if (i %% 10 == 0) {
+    print(paste("Linha", i))
+  }
+  for (j in (i + 1):nrow) {
+    dist <- st_distance(locVec[[i]], locVec[[j]], which = "Hausdorff")
+    distMatrix[i, j] <- dist
+    distMatrix[j, i] <- dist
+  }
+}
+
+print("Matriz de distâncias calculada com sucesso!")
+
+
+
+
+# hdist_sf = hdist_sf(loc_sf)
+# hdist = hdist(loc)
+
+# hdist_sf == hdist
+```
+
+```{r}
+library(CARBayesdata)
+library(sf)
+
+# Carregar dados
+data(GGHB.IZ)
+data(respiratorydata)
+
+# Filtrar as geometrias correspondentes e extrair apenas a coluna de geometria
+locVec <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, "geometry"]
+
+# Verificar número de linhas
+nrow <- nrow(locVec)
+distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
+print(nrow)
+
+# Calcular matriz triangular de distâncias de Hausdorff
+cat("Calculando matriz triangular de distâncias de Hausdorff, n =", nrow, "\n")
+for (i in 1:(nrow - 1)) {
+  if (i %% 10 == 0) {
+    print(paste("Linha", i))
+  }
+  for (j in (i + 1):nrow) {
+    # Extrair as geometrias diretamente
+    geom_i <- locVec$geometry[i]
+    geom_j <- locVec$geometry[j]
+    
+    # Calcular distância de Hausdorff
+    dist <- st_distance(geom_i, geom_j, which = "Hausdorff")
+    distMatrix[i, j] <- dist
+    distMatrix[j, i] <- dist
+  }
+}
+
+# Resultado
+cat("Cálculo concluído!\n")
+
+```

@@ -5,7 +5,7 @@
 rm(list=ls())
 
 
-setwd("C:/Users/Gabriel/Documents/Gabriel/IC/Gaussian_example/")
+setwd("C:/Users/Gabriel/Documents/Gabriel/IC/Gaussian_example-socorro/")
 
 
 #######################
@@ -42,11 +42,35 @@ library(sf)
 
 dir.save = getwd()
 
+```
 
-## simulate data
-set.seed(1232)
-n 	<- 1000
-loc 	<- cbind(runif(n,0,1), runif(n,0,1))
+
+```{r}
+# simulate data
+# set.seed(1232)
+# n 	<- 500
+# loc 	<- cbind(runif(n,0,1), runif(n,0,1))
+# sf_points_list <- sapply(1:nrow(loc), function(i) {
+#   st_point(loc[i, ])
+# }, simplify = FALSE)
+
+# loc_sf <- st_sfc(sf_points_list)
+
+```
+
+```{r}
+library(CARBayesdata)
+data(GGHB.IZ)
+data(respiratorydata) # dados usados pelo Lucas
+
+
+loc_sf <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]
+loc = st_coordinates(st_centroid(loc_sf))
+n = nrow(loc)
+
+```
+
+```{r}
 
 sigma.sq <- 1
 tau.sq	 <- 0.1
@@ -56,12 +80,10 @@ nu 	 <- 0.5
 alpha = 1
 
 range    <-  log(10)^(1/alpha) * phi  
-range1    <- sqrt(8 * nu) * phi 
+# range1    <- sqrt(8 * nu) * phi 
 
 D 	 <- as.matrix(dist(loc))
-```
 
-```{r}
 ##PowExp##
 R <- exp((-1) * (D/phi)^alpha)
 
@@ -83,28 +105,15 @@ y 		<- rnorm(nloc, X%*%B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
 ```
 
 ```{r}
-case='regular'
-
-
-#number of blocks (n.partition=8 ---> n.blocks= 8^2 = 64 blocks)
-n.partition 	<- 8
-n.blocks    	<- n.partition^2
-#number of neigbhor blocks
-num.nb 	<- 2
-res1 	 	<- blockNNGP_reg(case, loc,  y, X, w,  dir.save, n.blocks, num.nb)
-summary(res1)
-```
-
-```{r}
 
 case='irregular'
 
 
 #number of blocks (nexp=7 ---> n.blocks=2^7)
 nexp 	 <- 7
-n.blocks <- 2^nexp
+n.blocks <- 8  # menor valor de n.block é 8 -> indr
 #number of neigbhor blocks
-num.nb   <- 2
-res2	 <- blockNNGP(case, loc,  y, X, w, dir.save, n.blocks, num.nb)
+num.nb   <- 1
+res2	 <- blockNNGP(case, loc,  y, X, w, dir.save, n.blocks, num.nb, loc_sf)
 summary(res2)
 ```
