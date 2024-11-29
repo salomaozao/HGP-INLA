@@ -190,13 +190,13 @@ blockNNGP = function(case="irregular", loc,  y, X, w.obs , dir.save, n.partition
   
   # inla function to fit the model
   # The user can change the family and priors here.
-  resf <- inla(f.blockNNGP, data = as.data.frame(data1), family = "gaussian")
+  resf <- inla(f.blockNNGP, data = as.data.frame(data1), family = "gpoisson")
   
   # Recovering the posterior mean estimation of nugget, marginal variance and phi parameters.
   # It depends on the internal representation of the hyperparameters.
-  tau.est 	<- 1/resf$summary.hyperpar$mean[1]
-  sigmasq.est 	<- exp(resf$summary.hyperpar$mean[2])
-  phi.est = 30 - (29)/ (1 + exp(resf$summary.hyperpar$mean[3]))
+  tau.est 	<- inla.emarginal(foo <-function(x){1/x},resf$marginals.hyperpar[[1]])
+  sigmasq.est 	<- inla.emarginal(foo <-function(x){exp(-x)},resf$marginals.hyperpar[[2]])
+  phi.est = inla.emarginal(foo <-function(x){1 - 1/(1 + exp(x))},resf$marginals.hyperpar[[3]])
   summary.theta 	<- c(tau.est, sigmasq.est, phi.est)
   print( c("tau.est","sigmasq.est","phi.est"))
   print(summary.theta)
@@ -228,7 +228,7 @@ blockNNGP = function(case="irregular", loc,  y, X, w.obs , dir.save, n.partition
   
   return(resf)
   
-  }
+}
   
   
   

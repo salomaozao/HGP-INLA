@@ -2,7 +2,7 @@
 - hdist muito devagar
 
 ```{r}
-rm(list=ls())
+rm(list = ls())
 
 
 setwd("C:/Users/Gabriel/Documents/Gabriel/IC/Gaussian_example-socorro/")
@@ -10,7 +10,7 @@ setwd("C:/Users/Gabriel/Documents/Gabriel/IC/Gaussian_example-socorro/")
 
 #######################
 ## functions required
-####################### 
+#######################
 
 source("blockNNGPfunctionREGULAR.R")
 source("blockNNGPfunctionIRREGULAR.R")
@@ -22,11 +22,11 @@ source("utils.R")
 
 #######################
 ## libraries required
-####################### 
+#######################
 library(INLA)
 library(fields)
 library(lattice)
-library(akima) 
+library(akima)
 library(Matrix)
 library(slam)
 library(igraph)
@@ -40,7 +40,7 @@ library(raster)
 library(sf)
 
 
-dir.save = getwd()
+dir.save <- getwd()
 
 ```
 
@@ -63,57 +63,57 @@ library(CARBayesdata)
 data(GGHB.IZ)
 data(respiratorydata) # dados usados pelo Lucas
 
-
+#  Queremos inferir GGHB.IZ$SMR
 loc_sf <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]
-loc = st_coordinates(st_centroid(loc_sf))
-n = nrow(loc)
+loc <- st_coordinates(st_centroid(loc_sf))
+n <- nrow(loc)
 
 ```
 
 ```{r}
 
 sigma.sq <- 1
-tau.sq	 <- 0.1
-phi 	 <- 1/3
+tau.sq <- 0.1
+phi <- 1 / 3
 
-nu 	 <- 0.5
-alpha = 1
+nu <- 0.7
+alpha <- 0.7
 
-range    <-  log(10)^(1/alpha) * phi  
-# range1    <- sqrt(8 * nu) * phi 
+range <- log(10)^(1 / alpha) * phi
+# range1    <- sqrt(8 * nu) * phi
 
-D 	 <- as.matrix(dist(loc))
+D <- as.matrix(dist(loc))
 
-##PowExp##
-R <- exp((-1) * (D/phi)^alpha)
+## PowExp##
+R <- exp((-1) * (D / phi)^alpha)
 
-diag(R)  <- 1
-nloc 	 <- dim(loc)[1]
-C 	 <- sigma.sq*R
+diag(R) <- 1
+nloc <- dim(loc)[1]
+C <- sigma.sq * R
 
-D 	 	<- chol(C)
-rnorm_n.obs 	<- rnorm(n)
-w 		<- t(matrix(rnorm_n.obs, ncol=(n))%*%D )
+D <- chol(C)
+rnorm_n.obs <- rnorm(n)
+w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
 
-X 		<- as.matrix(cbind(1, rnorm(nloc))) ## X = intercept + covariate
+X <- as.matrix(cbind(1, rnorm(nloc))) ## X = intercept + covariate
 
-B 		<- as.matrix(c(1,5))
-p 		<- length(B)
+B <- as.matrix(c(1, 5))
+p <- length(B)
 
-y 		<- rnorm(nloc, X%*%B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
-
+# y 		<- rnorm(nloc, X%*%B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
+y <- respiratorydata$SMR
 ```
 
 ```{r}
 
-case='irregular'
+case <- "irregular"
 
 
-#number of blocks (nexp=7 ---> n.blocks=2^7)
-nexp 	 <- 7
-n.blocks <- 8  # menor valor de n.block é 8 -> indr
-#number of neigbhor blocks
-num.nb   <- 1
-res2	 <- blockNNGP(case, loc,  y, X, w, dir.save, n.blocks, num.nb, loc_sf)
+# number of blocks (nexp=7 ---> n.blocks=2^7)
+nexp <- 7
+n.blocks <- 8 # menor valor de n.block é 8 -> indr
+# number of neigbhor blocks
+num.nb <- 1
+res2 <- blockNNGP(case, loc, y, X, w, dir.save, n.blocks, num.nb, loc_sf)
 summary(res2)
 ```

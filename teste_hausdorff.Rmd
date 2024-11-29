@@ -1,81 +1,13 @@
 ```{r}
-hdist_sf <- function(locVec) {
-  return(distMatrix)
-}
-```
-
-```{r}
 library(CARBayesdata)
 data(GGHB.IZ)
 data(respiratorydata) # dados usados pelo Lucas
+str(GGHB.IZ)
+GGHB.IZ$respiratorydata
+summary(respiratorydata)
 
+length(respiratorydata$SMR)
 
-locVec <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]
-# loc = st_coordinates(st_centroid(loc_sf))
-
-nrow <- nrow(locVec)
-distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
-print(nrow)
-
-
-cat("Calculando matriz triangular de distâncias de Hausdorff, n =", nrow, "\n")
-for (i in 1:(nrow - 1)) {
-  if (i %% 10 == 0) {
-    print(paste("Linha", i))
-  }
-  for (j in (i + 1):nrow) {
-    dist <- st_distance(locVec[[i]], locVec[[j]], which = "Hausdorff")
-    distMatrix[i, j] <- dist
-    distMatrix[j, i] <- dist
-  }
-}
-
-print("Matriz de distâncias calculada com sucesso!")
-
-
-
-
-# hdist_sf = hdist_sf(loc_sf)
-# hdist = hdist(loc)
-
-# hdist_sf == hdist
-```
-
-```{r}
-library(CARBayesdata)
-library(sf)
-
-# Carregar dados
-data(GGHB.IZ)
-data(respiratorydata)
-
-# Filtrar as geometrias correspondentes e extrair apenas a coluna de geometria
-locVec <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, "geometry"]
-
-# Verificar número de linhas
-nrow <- nrow(locVec)
-distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
-print(nrow)
-
-# Calcular matriz triangular de distâncias de Hausdorff
-cat("Calculando matriz triangular de distâncias de Hausdorff, n =", nrow, "\n")
-for (i in 1:(nrow - 1)) {
-  if (i %% 10 == 0) {
-    print(paste("Linha", i))
-  }
-  for (j in (i + 1):nrow) {
-    # Extrair as geometrias diretamente
-    geom_i <- locVec$geometry[i]
-    geom_j <- locVec$geometry[j]
-    
-    # Calcular distância de Hausdorff
-    dist <- st_distance(geom_i, geom_j, which = "Hausdorff")
-    distMatrix[i, j] <- dist
-    distMatrix[j, i] <- dist
-  }
-}
-
-# Resultado
-cat("Cálculo concluído!\n")
-
+?inla
+inla.list.models()
 ```
