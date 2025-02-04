@@ -1,13 +1,87 @@
+
+
 ```{r}
+rm(list = ls())
+
+
+setwd("C:/Users/Gabriel/Documents/Gabriel/IC/Gaussian_example-socorro/")
+
+source("blockNNGPfunctionREGULAR.R")
+source("blockNNGPfunctionIRREGULAR.R")
+source("NNGPfunction.R")
+source("blockNNGPrgeneric.R")
+source("NNGPrgeneric.R")
+source("Irregblock.R")
+source("utils.R")
+
+library(INLA)
+library(fields)
+library(lattice)
+library(akima)
+library(Matrix)
+library(slam)
+library(igraph)
+library(coda)
+library(MBA)
+library(mvtnorm)
+library(ggforce)
+library(Rcpp)
+library(tidyverse)
+library(raster)
+library(sf)
 library(CARBayesdata)
 data(GGHB.IZ)
 data(respiratorydata) # dados usados pelo Lucas
-str(GGHB.IZ)
-GGHB.IZ$respiratorydata
-summary(respiratorydata)
 
-length(respiratorydata$SMR)
 
-?inla
-inla.list.models()
+dir.save <- getwd()
+
+```
+
+
+```{r}
+hdist_sf <- function(locVec) {
+  nrow <- length(locVec)
+  distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
+
+  # Calcular matriz triangular de distâncias de Hausdorff
+  cat("Calculando matriz triangular de distâncias de Hausdorff, n =", nrow, "\n")
+  for (i in 1:(nrow - 1)) {
+    if (i %% 10 == 0) {
+      print(paste("Linha", i))
+    }
+    for (j in (i + 1):nrow) {
+      geom_i <- locVec[[i]]
+      geom_j <- locVec[[j]]
+
+      dist <- st_distance(geom_i, geom_j, which = "Hausdorff")
+      distMatrix[i, j] <- dist
+      distMatrix[j, i] <- dist
+    }
+  }
+
+  return(distMatrix)
+}
+```
+
+```{r}
+# simulate data
+set.seed(1232)
+n 	<- 50
+loc 	<- cbind(runif(n,0,1), runif(n,0,1))
+pts_sf <- sapply(1:nrow(loc), function(i) {
+  st_point(loc[i, ])
+}, simplify = FALSE)
+
+D = hdist_sf(pts_sf)
+```
+
+```{r}
+
+#  Queremos inferir GGHB.IZ$SMR
+loc_sf <- st_as_sfc(GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]  )
+centroids <- st_centroid(loc_sf)
+
+hdist_sf(centroids)
+hdist_sf(loc_sf)
 ```

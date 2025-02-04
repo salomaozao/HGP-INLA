@@ -144,9 +144,8 @@ hdist <- function(locMatrix) {
 
 
 hdist_sf <- function(locVec) {
-  nrow <- nrow(locVec)
+  nrow <- length(locVec)
   distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
-  print(nrow)
 
   # Calcular matriz triangular de distâncias de Hausdorff
   cat("Calculando matriz triangular de distâncias de Hausdorff, n =", nrow, "\n")
@@ -155,8 +154,8 @@ hdist_sf <- function(locVec) {
       print(paste("Linha", i))
     }
     for (j in (i + 1):nrow) {
-      geom_i <- locVec$geometry[i]
-      geom_j <- locVec$geometry[j]
+      geom_i <- locVec[[i]]
+      geom_j <- locVec[[j]]
 
       dist <- st_distance(geom_i, geom_j, which = "Hausdorff")
       distMatrix[i, j] <- dist
