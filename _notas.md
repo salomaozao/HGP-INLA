@@ -35,8 +35,12 @@
 
 # Commits:
 
-### 3/2/25 SETBACK: hdist funcionando (sem dados de área)
+### 10/2/25 Implementação do sf no ajuste do modelo
+- Implementado centróides na criação dos blocos
+- A matriz ordenada `orderedLoc` agora é um objeto `sf`, que foi passada para fazer a matriz de distância usando a função sf `hdist_sf`
 
+
+### 3/2/25 SETBACK: hdist funcionando (sem dados de área)
 - Baixei a versão `"Ajustes do uso dos parâmetros do ajuste (Funcionando direito agora)"`
 - implementado o `hdist`
 - Ajustadas as funções dos parâmetros no INLA (`[[blockNNGPfunctionIRREGULAR.R:188]]`)
