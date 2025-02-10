@@ -1,35 +1,45 @@
-# O que precisa ser feito:
+# TODO
+- [ OK! ] Arrumar estimação
 
-- [ OK ] MELHORAR ESTIMAÇÃO
-
-- [ ] Ajustar os dados do CAR para regressão Poisson ( dados discretos ) (?)
-    -> Os dados da variável dependente SMR são uma taxa, mas a variável dependente de um processo poisson seria contagem?
-    -> A variavel resposta deve ser respiratorydata$observed e deve ser introduzido um offset no modelo. no inla, vc bota o offset com E = <offset>
-    - https://becarioprecario.bitbucket.io/inla-gitbook/ch-INLA.html#sec:GLM
-
-- [ ] Separar o block apenas para o rgeneric (?)
-    -> Separar a blocagem em uma outra função?
-
-
-
+- Refactor do código
+    - [ OK ] Pegar centróides para sortloc
+    - [ OK ] Trabalhar com `sf` no `locs` para suporte de dados de área
+    - [ ] Separar a blocagem
+    - [ ] Separar geração do modelo 
+    - [ ] Juntar todos pontos acima em uma função `createHGP(sf, n.partition)`
+    
+    - [ ] Separar a parte da geração dos dados e ajuste do modelo, implementar pensando na geração dos dados de área
+    
 
 
-
-NOTAS:
-- Apenas 1 hdist é possível? Se não, melhorar nomeclatura
-
-=========================
-O que quero fazer:
-1. Arrumar estimação.
-
-dados reais:                    0.1       1         1/3
-caso pointdata antigo:          0.1154132 1.4536849 0.5149386  \\ 0.09881827 1.20887559 0.33474234
-caso pointdata antigo ajustado: 0.1015100 1.7776850 0.4391706
-caso atual:                     0.2732637 0.4066729 0.3088849
+- Implementações
+    - [ ] Implementar regressão Poisson
+    - [ ] Implementação de dados de área
+    - [ ] Ajustar os dados do CAR para regressão Poisson ( dados discretos ) (?)
+        -> Os dados da variável dependente SMR são uma taxa, mas a variável dependente de um processo poisson seria contagem?
+        -> A variavel resposta deve ser respiratorydata$observed e deve ser introduzido um offset no modelo. no inla, vc bota o offset com E = <offset>
+        - https://becarioprecario.bitbucket.io/inla-gitbook/ch-INLA.html#sec:GLM
 
 
+- Ajustes:
+    - [ ] exigir sf no hdist_sf
+    - [ ] usar dist euclidiana na blocagem
+
+- ideias:
+    - [ ] mudar hdist para makeDistMatrix() e ter opção haussdorff ou euclidiana
+
+-shapefile
+# Problemas no Código:
+    passar coords.D no NNGP erra a estimação (porque?)
 
 
+# Commits:
 
-2. Refactor
-    1. runblock -> DRY, calcular matriz D
+### 3/2/25 SETBACK: hdist funcionando (sem dados de área)
+
+- Baixei a versão `"Ajustes do uso dos parâmetros do ajuste (Funcionando direito agora)"`
+- implementado o `hdist`
+- Ajustadas as funções dos parâmetros no INLA (`[[blockNNGPfunctionIRREGULAR.R:188]]`)
+- Arrumei o runblock para isso
+ 
+

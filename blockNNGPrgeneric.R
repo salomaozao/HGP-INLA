@@ -85,7 +85,16 @@
   # Q function defines the precision matrix which is defined in a similar way of W. Here we define the precision matrix of the blockNNGP latent effect.
   Q <- function() {
     require(Matrix)
+
     param <- interpret.theta()
+
+    ###########
+    ## Matérn
+    ###########
+    #nu <- 0.5
+    # R <- (sqrt(2*nu)*coords.D/param$phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=sqrt(2*nu)*coords.D/param$phi, nu=nu)
+    
+
 
     ###########
     ## PowExp

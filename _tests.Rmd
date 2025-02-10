@@ -1,0 +1,23 @@
+```{r}
+n <- 200
+loc <- matrix(c(runif(n, 0, 1), runif(n, 0, 1)), ncol = 2)
+
+colnames(loc) <- c("x", "y") 
+
+sf <- st_as_sf(
+  as.data.frame(loc),  
+  coords = c("x", "y"),  
+  crs = 4326  
+)
+
+dist(loc)
+
+st_coordinates(sf[1,])  # extract data
+
+class(sf)  # "sf", "data.frame"
+if (!'sf' %in% class(sf)) stop("sf is not a spatial data frame.")
+
+sf[200,]
+st_centroid(sf)  # returns centroids
+```
+

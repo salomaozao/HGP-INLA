@@ -23,9 +23,6 @@ blockNNGP = function(
   num.nb,
   coords.D
 ) {
-
-  if (!'sf' %in% class(sf)) stop("sf is not a spatial data frame.")
-
   # createblocks = function (loc, n.blocks){
   #  create blocks via kdtree
   nloc <- dim(loc)[1]
@@ -33,16 +30,16 @@ blockNNGP = function(
   loc.blocks <- matrix(NA, n.blocks, 2)
   nb <- NULL # Pontos por bloco
 
-  centroids = st_centroid(sf)  # get centroids to sort the blocks
-  centroids_coords = st_coordinates(centroids)
-  points <- data.frame(x = centroids_coords[, 1], y = centroids_coords[, 2]) # Cria dataframe com coordenadas.
+  points <- data.frame(x = loc[, 1], y = loc[, 2]) # Cria dataframe com coordenadas.
   tree <- kdtree(points) # Cria kd-tree
   treenew <- tree[1:(n.blocks - 1), ] # cria subsets de kd-tree para dividir
   blocks <- kdtree_blocks(treenew, n.blocks, loc) # atribui pontos aos blocos
 
+  
+
   for (k in 1:n.blocks) {
     indblock <- which(blocks == k)
-    loc.blocks[k, ] <- c(mean(centroids_coords[indblock, 1]), mean(centroids_coords[indblock, 2]))
+    loc.blocks[k, ] <- c(mean(loc[indblock, 1]), mean(loc[indblock, 2]))
   }
 
   #  sort blocks,
@@ -96,13 +93,7 @@ blockNNGP = function(
   # g1 = graph.adjacency(AdjMatrix, mode = 'directed')
 
   ind1 <- sort.int(blocks, index.return = TRUE)
-  print(NROW(sf))
-  print(NROW(loc))
-
-  print(dim(sf))
-  print(dim(loc))
-  orderedLoc <- sf[(ind1$ix), ] 
-  # orderedLoc <- loc[(ind1$ix), ]  # supposed to use
+  loc <- loc[(ind1$ix), ]
 
   # return(list(
   #   blocks = blocks,          # Vetor de atribuição de blocos
@@ -142,7 +133,7 @@ blockNNGP = function(
       nb[j] <- nb[j - 1] + nbj
     }
   }
-  nloc <- dim(orderedLoc)[1]
+  nloc <- dim(loc)[1]
   ind_obs1 <- which(blocks == 1)
   num1 <- seq(1:length(ind_obs1))
 
@@ -152,7 +143,7 @@ blockNNGP = function(
   }
 
   ## mask for precision-blockNNGP
-  coords.D <- hdist_sf(orderedLoc)
+  coords.D <- hdist(loc)
   C1 <- exp(-0.04 * coords.D)
   invC <- PrecblockNNGP(n, n.blocks, C1, nb, ind_obs1, num1, indb)
   invCsp <- as.matrix(invC)

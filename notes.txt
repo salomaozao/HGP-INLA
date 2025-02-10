@@ -1,0 +1,13 @@
+runblockNNGP
+1. pegar os pontos ordenados e calcular matriz de distância orderedLoc
+
+2. Passar orderedLoc para blockNNGPfunctionIRREGULAR
+
+
+Pegar o centroide > gera a blocagem > gera modelo generic (blockNNGP.model)
+
+createHGP(sf, n.partition)
+
+
+trabalhar só com elemento sf 
+

@@ -87,10 +87,7 @@ Prec_NNGP  = function(loc,AdjMatrix,Sigma){
   }
 
   # mu function is the mean of the blockNNGP latent effect which is zero.
- mu <- function()
-  {
-    return(numeric(0))
-  }
+ mu <- function() return(numeric(0))
 
   # log.norm.const function computes the normalizing constant, INLA computes it if numeric is zero.
  log.norm.const <- function() {
