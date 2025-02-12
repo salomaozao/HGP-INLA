@@ -4,7 +4,7 @@
 - Refactor do código
     - [ OK ] Pegar centróides para sortloc
     - [ OK ] Trabalhar com `sf` no `locs` para suporte de dados de área
-    - [ ] Separar a blocagem
+    - [ OK ] Separar a blocagem
     - [ ] Separar geração do modelo 
     - [ ] Juntar todos pontos acima em uma função `createHGP(sf, n.partition)`
     

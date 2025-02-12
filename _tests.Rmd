@@ -1,23 +1,97 @@
 ```{r}
-n <- 200
-loc <- matrix(c(runif(n, 0, 1), runif(n, 0, 1)), ncol = 2)
+createblocks <- function(sf, n.blocks, num.nb) {
+  if (!"sf" %in% class(sf)) stop("sf must be an sf object")
 
-colnames(loc) <- c("x", "y") 
+  # 1. Calcular centróides e criar kdtree
+  centroids <- st_centroid(sf)
+  centroids_coords <- st_coordinates(centroids)
+  points <- data.frame(x = centroids_coords[, 1], y = centroids_coords[, 2])
+  tree <- kdtree(points)
 
-sf <- st_as_sf(
-  as.data.frame(loc),  
-  coords = c("x", "y"),  
-  crs = 4326  
-)
+  # 2. Criar atribuição inicial de blocos
+  treenew <- tree[1:(n.blocks - 1), ]
+  blocks <- kdtree_blocks(treenew, n.blocks, st_coordinates(sf))
 
-dist(loc)
+  # 3. Calcular centróides dos blocos e ordenar
+  loc.blocks <- matrix(NA, n.blocks, 2)
+  for (k in 1:n.blocks) {
+    indblock <- which(blocks == k)
+    loc.blocks[k, ] <- colMeans(centroids_coords[indblock, , drop = FALSE])
+  }
 
-st_coordinates(sf[1,])  # extract data
+  # Ordenação vertical
+  ind_y <- sort(loc.blocks[, 2], index.return = TRUE)
+  loc.blocks <- loc.blocks[ind_y$ix, ]
+  blocks_temp <- blocks
+  for (i in 1:n.blocks) {
+    blocks[blocks_temp == ind_y$ix[i]] <- i
+  }
 
-class(sf)  # "sf", "data.frame"
-if (!'sf' %in% class(sf)) stop("sf is not a spatial data frame.")
+  # Ordenação horizontal em grupos
+  indr <- ifelse(
+    n.blocks %in% c(8, 16),
+    4,
+    ifelse(n.blocks %in% c(32, 64), 8, 16)
+  )
 
-sf[200,]
-st_centroid(sf)  # returns centroids
+  indexsort1 <- NULL
+  for (j in 1:(n.blocks / indr)) {
+    grupo <- loc.blocks[((j - 1) * indr + 1):(j * indr), ]
+    ind_x <- sort(grupo[, 1], index.return = TRUE)
+    indexsort1 <- c(indexsort1, ind_x$ix + (j - 1) * indr)
+  }
+
+  # Aplicar ordenação final
+  blocks_temp <- blocks
+  for (i in 1:n.blocks) {
+    blocks[blocks_temp == indexsort1[i]] <- i
+  }
+
+  # 4. Construir matriz de adjacência
+  dist.mat <- hdist(loc.blocks)
+  AdjMatrix <- matrix(0, n.blocks, n.blocks)
+
+  for (j in 2:n.blocks) {
+    if (j <= num.nb + 1) {
+      AdjMatrix[1:(j - 1), j] <- 1
+    } else {
+      ind_nb <- order(dist.mat[, j])[1:num.nb]
+      AdjMatrix[ind_nb[ind_nb < j], j] <- 1
+    }
+  }
+
+  # 5. Reordenar os dados
+  sortIndex <- order(blocks)
+  ordered_sf <- sf[sortIndex, ]
+
+  return(
+    list(
+      sortIndex = sortIndex,
+      adjMatrix = AdjMatrix
+    )
+  )
+}
 ```
 
+
+```{r}
+
+set.seed(1232)
+n <- 200
+loc <- cbind(runif(n, 0, 1), runif(n, 0, 1))
+colnames(loc) <- c("x", "y")
+sf <- st_as_sf(
+  as.data.frame(loc),
+  coords = c("x", "y"),
+  crs = 4326
+)
+
+n.partition <- 8
+n.blocks <- n.partition^2
+num.nb <- 2
+
+block_structure <- createblocks(sf, n.blocks, num.nb)
+
+block_structure
+
+```

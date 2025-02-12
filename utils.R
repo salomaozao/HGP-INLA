@@ -14,25 +14,24 @@ meancov_nn <- function(Sigma, ind_obs, ind_neigblocks, indnum) {
   return(val)
 }
 
-
 PrecblockNNGP <- function(nloc, n.blocks, Sigma, nb, ind_obs1, num1, indb) {
   Fs_1 <- matrix(0, nloc, nloc)
   Bb <- matrix(0, nloc, nloc)
-  cat("Sigma: ", length(Sigma), " //  ", nrow(Sigma), "x", ncol(Sigma), "\n")
-  cat("ind_obs1: ", ind_obs1, "\n")
   Fs_1[1:nb[1], 1:nb[1]] <- chol2inv(chol(Sigma[ind_obs1, ind_obs1]))
 
   Bstar_bi <- matrix(0, length(ind_obs1), nloc)
 
-  print(nloc == length(ind_obs1))
   diag(Bstar_bi) <- 1
-  # diag(Bstar_bi) <- 1
-
 
   Bb[1:nb[1], ] <- Bstar_bi
   #    system.time(
   for (j in 2:n.blocks) {
-    ress <- meancov_nn(Sigma, indb[[j - 1]][[1]], indb[[j - 1]][[2]], indb[[j - 1]][[4]])
+    ress <- meancov_nn(
+      Sigma,
+      indb[[j - 1]][[1]],
+      indb[[j - 1]][[2]],
+      indb[[j - 1]][[4]]
+    )
     Fs_1[(nb[j - 1] + 1):(nb[j]), (nb[j - 1] + 1):(nb[j])] <- ress$invFbi
     Bb[(nb[j - 1] + 1):(nb[j]), ] <- ress$Bstar_bi
   }
@@ -45,8 +44,6 @@ PrecblockNNGP <- function(nloc, n.blocks, Sigma, nb, ind_obs1, num1, indb) {
 
   return(invCs)
 }
-
-
 
 util.index <- function(i, blocks, AdjMatrix, newindex) {
   ind_obs <- which(blocks == i)
@@ -63,8 +60,6 @@ util.index <- function(i, blocks, AdjMatrix, newindex) {
   return(list(ind_obs, ind_neigblocks, index, indnum))
 }
 
-
-
 ## NNGP functions
 
 meancov_nn1 <- function(i, loc, AdjMatrix, Sigma) {
@@ -77,12 +72,9 @@ meancov_nn1 <- function(i, loc, AdjMatrix, Sigma) {
   Bstar_bi[, ind_neig] <- -B_bi
   Bstar_bi[i] <- 1
 
-
   val <- list(B_bi = B_bi, F_bi = F_bi, Bstar_bi = Bstar_bi)
   return(val)
 }
-
-
 
 Prec_NNGP <- function(loc, AdjMatrix, Sigma) {
   nloc <- dim(loc)[1]
@@ -112,8 +104,6 @@ Prec_NNGP <- function(loc, AdjMatrix, Sigma) {
   return(invCs)
 }
 
-
-
 hdist <- function(locMatrix) {
   nrow <- nrow(locMatrix)
   if (ncol(locMatrix) < 2) {
@@ -121,12 +111,19 @@ hdist <- function(locMatrix) {
   }
 
   # Vetor de pontos
-  ptsVec <- lapply(1:nrow, function(i) st_point(c(locMatrix[i, 1], locMatrix[i, 2])))
+  ptsVec <- lapply(
+    1:nrow,
+    function(i) st_point(c(locMatrix[i, 1], locMatrix[i, 2]))
+  )
 
   # Matriz de distância (inicializa com zeros)
   distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
 
-  cat("Calculando matriz triangular de distâncias de Hausdorff, n =", nrow, "\n")
+  cat(
+    "Calculando matriz triangular de distâncias de Hausdorff, n =",
+    nrow,
+    "\n"
+  )
   for (i in 1:(nrow - 1)) {
     if (i %% 10 == 0) {
       print(paste("Linha", i))
@@ -145,8 +142,12 @@ hdist <- function(locMatrix) {
 hdist_sf <- function(locVec) {
   nrow <- nrow(locVec)
   distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
-  
-  cat("Calculando matriz triangular de distâncias de Hausdorff, n =", nrow, "\n")
+
+  cat(
+    "Calculando matriz triangular de distâncias de Hausdorff, n =",
+    nrow,
+    "\n"
+  )
   for (i in 1:(nrow - 1)) {
     if (i %% 10 == 0) {
       print(paste("Linha", i))
@@ -155,7 +156,7 @@ hdist_sf <- function(locVec) {
       # Acessar a geometria das linhas i e j
       geom_i <- st_geometry(locVec[i, ])
       geom_j <- st_geometry(locVec[j, ])
-      
+
       # Calcular distância de Hausdorff
       dist <- st_distance(geom_i, geom_j, which = "Hausdorff")
       distMatrix[i, j] <- as.numeric(dist)
@@ -163,4 +164,80 @@ hdist_sf <- function(locVec) {
     }
   }
   return(distMatrix)
+}
+
+
+createblocks = function(loc, sf, n.blocks, num.nb) {
+  nloc <- dim(loc)[1]
+  blocks <- NULL
+  loc.blocks <- matrix(NA, n.blocks, 2)
+  nb <- NULL # Pontos por bloco
+
+  centroids = st_centroid(sf) # get centroids to sort the blocks
+  centroids_coords = st_coordinates(centroids)
+  points <- data.frame(x = centroids_coords[, 1], y = centroids_coords[, 2]) # Cria dataframe com coordenadas.
+  tree <- kdtree(points) # Cria kd-tree
+  treenew <- tree[1:(n.blocks - 1), ] # cria subsets de kd-tree para dividir
+  blocks <- kdtree_blocks(treenew, n.blocks, loc) # atribui pontos aos blocos
+
+  for (k in 1:n.blocks) {
+    indblock <- which(blocks == k)
+    loc.blocks[k, ] <- c(
+      mean(centroids_coords[indblock, 1]),
+      mean(centroids_coords[indblock, 2])
+    )
+  }
+
+  ind <- sort.int(loc.blocks[, 2], index.return = TRUE)
+  new.locblocks <- cbind(loc.blocks[ind$ix, 1], ind$x)
+  blocks0 <- blocks
+
+  for (i in (1:n.blocks)) {
+    indi <- which(blocks0 == ind$ix[i])
+    blocks[indi] <- i
+  }
+
+  if (n.blocks %in% c(8, 16)) indr <- 4
+  if (n.blocks %in% c(32, 64)) indr <- 8
+  if (n.blocks == 128) indr <- 16
+
+  indexsort1 <- NULL
+
+  for (j in 1:(n.blocks / indr)) {
+    h1 <- new.locblocks[(((j - 1) * indr) + 1):(j * indr), ]
+    indh1 <- sort.int(h1[, 1], index.return = TRUE)
+    indexsort1 <- c(indexsort1, indh1$ix + ((j - 1) * indr))
+  }
+
+  blocks01 <- blocks
+  for (i in (1:n.blocks)) {
+    indi <- which(blocks01 == indexsort1[i])
+    blocks[indi] <- i
+  }
+  #  build the adjacency matrix,
+  sortloc <- new.locblocks[indexsort1, ]
+  dist.mat <- hdist(sortloc)
+
+  AdjMatrix <- matrix(0, n.blocks, n.blocks)
+
+  for (j in 2:n.blocks) {
+    if (j <= num.nb + 1) {
+      AdjMatrix[1:(j - 1), j] = 1
+    } else {
+      ind1 <- (sort(dist.mat[, j], index.return = TRUE))$ix
+      ind <- (ind1[which(ind1 < j)])[1:num.nb]
+      AdjMatrix[ind, j] = 1
+    }
+  }
+
+  nloc <- dim(loc)[1]
+  ind1 <- sort.int(blocks, index.return = TRUE)
+
+  return(
+    list(
+      ind1 = ind1,
+      AdjMatrix = AdjMatrix,
+      blocks = blocks
+    )
+  )
 }

@@ -19,110 +19,35 @@ blockNNGP = function(
   X,
   w.obs,
   dir.save,
-  n.partition,
+  n.partitions,
+  n.blocks,
   num.nb,
   coords.D
 ) {
-
   if (!'sf' %in% class(sf)) stop("sf is not a spatial data frame.")
 
-  # createblocks = function (loc, n.blocks){
-  #  create blocks via kdtree
-  nloc <- dim(loc)[1]
-  blocks <- NULL
-  loc.blocks <- matrix(NA, n.blocks, 2)
-  nb <- NULL # Pontos por bloco
 
-  centroids = st_centroid(sf)  # get centroids to sort the blocks
-  centroids_coords = st_coordinates(centroids)
-  points <- data.frame(x = centroids_coords[, 1], y = centroids_coords[, 2]) # Cria dataframe com coordenadas.
-  tree <- kdtree(points) # Cria kd-tree
-  treenew <- tree[1:(n.blocks - 1), ] # cria subsets de kd-tree para dividir
-  blocks <- kdtree_blocks(treenew, n.blocks, loc) # atribui pontos aos blocos
-
-  for (k in 1:n.blocks) {
-    indblock <- which(blocks == k)
-    loc.blocks[k, ] <- c(mean(centroids_coords[indblock, 1]), mean(centroids_coords[indblock, 2]))
-  }
-
-  #  sort blocks,
-  # blocks 	  	<- NULL
-  # blocks 	  	<- kdtree_blocks(treenew, n.blocks, loc)
-
-  #  reorder the data points
-  ind <- sort.int(loc.blocks[, 2], index.return = TRUE)
-  new.locblocks <- cbind(loc.blocks[ind$ix, 1], ind$x)
-  blocks0 <- blocks
-
-  for (i in (1:n.blocks)) {
-    indi <- which(blocks0 == ind$ix[i])
-    blocks[indi] <- i
-  }
-
-  if (n.blocks %in% c(8, 16)) indr <- 4
-  if (n.blocks %in% c(32, 64)) indr <- 8
-  if (n.blocks == 128) indr <- 16
-
-  indexsort1 <- NULL
-
-  for (j in 1:(n.blocks / indr)) {
-    h1 <- new.locblocks[(((j - 1) * indr) + 1):(j * indr), ]
-    indh1 <- sort.int(h1[, 1], index.return = TRUE)
-    indexsort1 <- c(indexsort1, indh1$ix + ((j - 1) * indr))
-  }
-
-  blocks01 <- blocks
-  for (i in (1:n.blocks)) {
-    indi <- which(blocks01 == indexsort1[i])
-    blocks[indi] <- i
-  }
-  #  build the adjacency matrix,
-  sortloc <- new.locblocks[indexsort1, ]
-  dist.mat <- hdist(sortloc)
-
-  AdjMatrix <- matrix(0, n.blocks, n.blocks)
-
-  for (j in 2:n.blocks) {
-    if (j <= num.nb + 1) {
-      AdjMatrix[1:(j - 1), j] = 1
-    } else {
-      ind1 <- (sort(dist.mat[, j], index.return = TRUE))$ix
-      ind <- (ind1[which(ind1 < j)])[1:num.nb]
-      AdjMatrix[ind, j] = 1
-    }
-  }
-  #  reorder the data points according to the block order
-
-  # g1 = graph.adjacency(AdjMatrix, mode = 'directed')
-
-  ind1 <- sort.int(blocks, index.return = TRUE)
-  print(NROW(sf))
-  print(NROW(loc))
-
-  print(dim(sf))
-  print(dim(loc))
-  orderedLoc <- sf[(ind1$ix), ] 
-  # orderedLoc <- loc[(ind1$ix), ]  # supposed to use
-
-  # return(list(
-  #   blocks = blocks,          # Vetor de atribuição de blocos
-  #   loc.blocks = sortloc,     # Centróides ordenados dos blocos
-  #   AdjMatrix = AdjMatrix,    # Matriz de adjacência
-  #   loc.sorted = loc,         # Localizações reordenadas
-  #   idx.sort = ind1$ix        # Índices de ordenação original
-  # ))
-  # }
-
-  blocks <- blocks[(ind1$ix)]
+  block_struc = createblocks(loc, sf, n.blocks, num.nb)
+  ind1 = block_struc$ind1
+  AdjMatrix = block_struc$AdjMatrix
+  blocks <- block_struc$blocks  
 
   y <- y[(ind1$ix)]
   X <- X[(ind1$ix), ]
   w <- w[(ind1$ix)]
+  blocks <- blocks[(ind1$ix)]
+  orderedLoc <- sf[(ind1$ix), ] 
 
+  # print(ind1$ix)
+  # print(y)
+  # print(X)
+  # print(w)
+  print(blocks)
   #   # Passo 1: Criar estrutura de blocos
   #   block_structure <- create_blocks(loc, n.partition, num.nb)
 
   #   # Passo 2: Reordenar dados conforme blocos
+  # blocks <- blocks[(block_structure$idx.sort)]
   #   y <- y[block_structure$idx.sort]
   #   X <- X[block_structure$idx.sort, ]
   #   w.obs <- w.obs[block_structure$idx.sort]

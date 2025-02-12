@@ -57,6 +57,7 @@ diag(R) <- 1
 nloc <- dim(loc)[1]
 C <- sigma.sq * R
 
+
 D <- chol(C)
 rnorm_n.obs <- rnorm(n)
 w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
@@ -75,6 +76,6 @@ y <- rnorm(nloc, X %*% B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
 n.partition <- 8
 n.blocks <- n.partition^2
 num.nb <- 2
-res1 <- blockNNGP('irregular', loc, sf, y, X, w, dir.save, n.blocks, num.nb)
+res1 <- blockNNGP('irregular', loc, sf, y, X, w, dir.save, n.partition ,n.blocks, num.nb)
 summary(res1)
 ```
