@@ -1,7 +1,7 @@
 ```{r}
 rm(list = ls())
 
-setwd("C:/Users/Gabriel/Documents/Gabriel/IC/hdist_working/")
+setwd("C:/Users/Gabriel/Documents/Gabriel/IC/final/Gaussian_example-main/")
 
 source("blockNNGPfunctionREGULAR.R")
 source("blockNNGPfunctionIRREGULAR.R")
@@ -22,7 +22,7 @@ library(coda)
 library(MBA)
 library(mvtnorm)
 library(ggforce)
-library(Rcpp)
+library(Rcpp) 
 library(tidyverse)
 library(raster)
 library(sf)
@@ -30,7 +30,7 @@ library(sf)
 dir.save = getwd()
 
 set.seed(1232)
-n <- 200
+n <-200
 loc <- cbind(runif(n, 0, 1), runif(n, 0, 1))
 colnames(loc) <- c("x", "y") 
 
@@ -77,5 +77,4 @@ n.partition <- 8
 n.blocks <- n.partition^2
 num.nb <- 2
 res1 <- blockNNGP('irregular', loc, sf, y, X, w, dir.save, n.partition ,n.blocks, num.nb)
-summary(res1)
 ```

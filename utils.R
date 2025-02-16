@@ -167,7 +167,7 @@ hdist_sf <- function(locVec) {
 }
 
 
-createblocks = function(loc, sf, n.blocks, num.nb) {
+get_blocksdata = function(loc, sf, n.blocks, num.nb) {
   nloc <- dim(loc)[1]
   blocks <- NULL
   loc.blocks <- matrix(NA, n.blocks, 2)
@@ -238,6 +238,51 @@ createblocks = function(loc, sf, n.blocks, num.nb) {
       ind1 = ind1,
       AdjMatrix = AdjMatrix,
       blocks = blocks
+    )
+  )
+}
+
+
+get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf) {
+  newindex <- NULL
+  nb <- matrix(NA, n.blocks, 1)
+  nb[1] <- length(which(blocks == 1))
+  for (j in 1:n.blocks) {
+    ind_obs <- which(blocks == j)
+    newindex <- c(newindex, ind_obs)
+    if (j > 1) {
+      nbj <- length(ind_obs)
+      nb[j] <- nb[j - 1] + nbj
+    }
+  }
+  nloc <- dim(sf)[1]
+  ind_obs1 <- which(blocks == 1)
+  num1 <- seq(1:length(ind_obs1))
+
+  indb <- NULL
+  for (k in 1:(n.blocks - 1)) {
+    indb[[k]] <- util.index(k + 1, blocks, AdjMatrix, newindex)
+  }
+
+  ## mask for precision-blockNNGP
+  coords.D <- hdist_sf(sf)
+  C1 <- exp(-0.04 * coords.D)
+  invC <- PrecblockNNGP(n, n.blocks, C1, nb, ind_obs1, num1, indb)
+  invCsp <- as.matrix(invC)
+  invCsp[which(invC > 0)] <- 1
+  invCsp[which(invC < 0)] <- 1
+  invCsp[which(invC == 0)] <- 0
+
+  W = invCsp
+  W <- as(W, "sparseMatrix")
+  return(
+    list(
+      W = W,
+      nb = nb,
+      ind_obs1 = ind_obs1,
+      num1 = num1,
+      indb = indb,
+      coords.D = coords.D
     )
   )
 }
