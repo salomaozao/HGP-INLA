@@ -12,7 +12,8 @@ blockNNGP = function(
 ) {
   if (!'sf' %in% class(sf)) stop("sf is not a spatial data frame.")
 
-  get_HGPdata = function(n.blocks, blocks, sf) {
+  # if this function is defined in utils, the parameters must be function(n.blocks, sf, y, X, w.obs, rnorm_n.obs, num.nb)
+  get_HGPdata = function(n.blocks, sf) {
     block_struc = get_blocksdata(loc, sf, n.blocks, num.nb)
     ind1 = block_struc$ind1
     AdjMatrix = block_struc$AdjMatrix
@@ -24,56 +25,6 @@ blockNNGP = function(
     blocks <- blocks[(ind1$ix)]
     sf <- sf[(ind1$ix), ]
     rnorm_n.obs <<- rnorm_n.obs[(ind1$ix)]
-
-    get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf) {
-      ### creating new indexes
-      newindex <- NULL
-      nb <- matrix(NA, n.blocks, 1)
-      nb[1] <- length(which(blocks == 1))
-
-      for (j in 1:n.blocks) {
-        ind_obs <- which(blocks == j)
-        newindex <- c(newindex, ind_obs)
-        if (j > 1) {
-          nbj <- length(ind_obs)
-          nb[j] <- nb[j - 1] + nbj
-        }
-      }
-
-      nloc <- dim(sf)[1]
-      n <- nloc # Definindo n para usar no PrecblockNNGP
-      ind_obs1 <- which(blocks == 1)
-      num1 <- seq(1, length(ind_obs1))
-
-      indb <- NULL
-      for (k in 1:(n.blocks - 1)) {
-        indb[[k]] <- util.index(k + 1, blocks, AdjMatrix, newindex)
-      }
-
-      ## mask for precision-blockNNGP
-      coords.D <- hdist_sf(sf)
-      C1 <- exp(-0.04 * coords.D) # for sparseMatrix
-
-      invC <- PrecblockNNGP(n, n.blocks, C1, nb, ind_obs1, num1, indb) # create precision matrix
-      invCsp <- as.matrix(invC) # 1 if points connect, 0 otherwise
-      invCsp[which(invC > 0)] <- 1
-      invCsp[which(invC < 0)] <- 1
-      invCsp[which(invC == 0)] <- 0
-
-      W = invCsp
-      W <- as(W, "sparseMatrix")
-
-      return(
-        list(
-          W = W,
-          nb = nb,
-          ind_obs1 = ind_obs1,
-          num1 = num1,
-          indb = indb,
-          coords.D = coords.D
-        )
-      )
-    }
 
     precMatrixData = get_precMatrixData(n.blocks, blocks, AdjMatrix, sf)
 
@@ -99,7 +50,7 @@ blockNNGP = function(
     )
   }
 
-  HGPdata = get_HGPdata(n.blocks, NULL, sf) # Note que 'blocks' será definido dentro de get_HGPdata
+  HGPdata = get_HGPdata(n.blocks, sf) # blocks é definido dentro de get_HGPdata
   W = HGPdata$W
   nb = HGPdata$nb
   ind_obs1 = HGPdata$ind_obs1

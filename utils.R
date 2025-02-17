@@ -104,41 +104,6 @@ Prec_NNGP <- function(loc, AdjMatrix, Sigma) {
   return(invCs)
 }
 
-hdist <- function(locMatrix) {
-  nrow <- nrow(locMatrix)
-  if (ncol(locMatrix) < 2) {
-    stop("locMatrix must have at least two columns")
-  }
-
-  # Vetor de pontos
-  ptsVec <- lapply(
-    1:nrow,
-    function(i) st_point(c(locMatrix[i, 1], locMatrix[i, 2]))
-  )
-
-  # Matriz de distância (inicializa com zeros)
-  distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
-
-  cat(
-    "Calculando matriz triangular de distâncias de Hausdorff, n =",
-    nrow,
-    "\n"
-  )
-  for (i in 1:(nrow - 1)) {
-    if (i %% 10 == 0) {
-      print(paste("Linha", i))
-    }
-    for (j in (i + 1):nrow) {
-      dist <- st_distance(ptsVec[[i]], ptsVec[[j]], which = "Hausdorff")
-      distMatrix[i, j] <- dist
-      distMatrix[j, i] <- dist
-    }
-  }
-
-  print("Matriz de distâncias calculada com sucesso!")
-  return(distMatrix)
-}
-
 hdist_sf <- function(locVec) {
   nrow <- nrow(locVec)
   distMatrix <- matrix(0, nrow = nrow, ncol = nrow)
@@ -216,7 +181,7 @@ get_blocksdata = function(loc, sf, n.blocks, num.nb) {
   }
   #  build the adjacency matrix,
   sortloc <- new.locblocks[indexsort1, ]
-  dist.mat <- hdist(sortloc)
+  dist.mat <- as.matrix(dist(sortloc))  
 
   AdjMatrix <- matrix(0, n.blocks, n.blocks)
 
@@ -244,9 +209,11 @@ get_blocksdata = function(loc, sf, n.blocks, num.nb) {
 
 
 get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf) {
+  ### creating new indexes
   newindex <- NULL
   nb <- matrix(NA, n.blocks, 1)
   nb[1] <- length(which(blocks == 1))
+
   for (j in 1:n.blocks) {
     ind_obs <- which(blocks == j)
     newindex <- c(newindex, ind_obs)
@@ -255,9 +222,11 @@ get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf) {
       nb[j] <- nb[j - 1] + nbj
     }
   }
+
   nloc <- dim(sf)[1]
+  n <- nloc # Definindo n para usar no PrecblockNNGP
   ind_obs1 <- which(blocks == 1)
-  num1 <- seq(1:length(ind_obs1))
+  num1 <- seq(1, length(ind_obs1))
 
   indb <- NULL
   for (k in 1:(n.blocks - 1)) {
@@ -266,15 +235,17 @@ get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf) {
 
   ## mask for precision-blockNNGP
   coords.D <- hdist_sf(sf)
-  C1 <- exp(-0.04 * coords.D)
-  invC <- PrecblockNNGP(n, n.blocks, C1, nb, ind_obs1, num1, indb)
-  invCsp <- as.matrix(invC)
+  C1 <- exp(-0.04 * coords.D) # for sparseMatrix
+
+  invC <- PrecblockNNGP(n, n.blocks, C1, nb, ind_obs1, num1, indb) # create precision matrix
+  invCsp <- as.matrix(invC) # 1 if points connect, 0 otherwise
   invCsp[which(invC > 0)] <- 1
   invCsp[which(invC < 0)] <- 1
   invCsp[which(invC == 0)] <- 0
 
   W = invCsp
   W <- as(W, "sparseMatrix")
+
   return(
     list(
       W = W,
@@ -286,3 +257,4 @@ get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf) {
     )
   )
 }
+

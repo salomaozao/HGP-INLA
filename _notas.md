@@ -4,11 +4,11 @@
 - Refactor do código
     - [ OK ] Pegar centróides para sortloc
     - [ OK ] Trabalhar com `sf` no `locs` para suporte de dados de área
-    - [ OK ] Separar a blocagem
-    - [ ] Separar geração do modelo 
-    - [ ] Juntar todos pontos acima em uma função `createHGP(sf, n.partition)`
+    - [ OK] Separar geração do modelo `createHGP(sf, n.partition)`
+        - [ OK ] Separar a blocagem
+        - [ OK ] Separar matriz de precisão
+        - [ OK ] fazer uma função generatemodel()
     
-    - [ ] Separar a parte da geração dos dados e ajuste do modelo, implementar pensando na geração dos dados de área
     
 
 
@@ -22,7 +22,7 @@
 
 
 - Ajustes:
-    - [ ] exigir sf no hdist_sf
+    - [ OK ] exigir sf no hdist_sf
     - [ ] usar dist euclidiana na blocagem
 
 - ideias:
@@ -34,6 +34,10 @@
 
 
 # Commits:
+### Implementado função generateHGP para gerar o modelo
+
+- Criadas as funções `get_precMatrixData()`, `get_blocksdata()` e uma função que junta as duas, `get_HGPdata()`
+
 
 ### 10/2/25 Implementação do sf no ajuste do modelo
 - Implementado centróides na criação dos blocos
