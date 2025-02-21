@@ -3,7 +3,7 @@ rm(list = ls())
 dir.save = getwd()
 set.seed(1232)
 
-setwd("C:/Users/Gabriel/Documents/Gabriel/IC/final/Gaussian_example-main/")
+setwd("C:/Users/Gabriel/Documents/Gabriel/IC/HGP-INLA/")
 
 source("blockNNGPfunctionREGULAR.R")
 source("blockNNGPfunctionIRREGULAR.R")
@@ -30,31 +30,65 @@ library(raster)
 library(sf)
 ```
 
-```{r}
-#  generate point data
-n <- 200
-loc <- cbind(runif(n, 0, 1), runif(n, 0, 1))
-colnames(loc) <- c("x", "y")
-
-sf <- st_as_sf(
-  as.data.frame(loc),
-  coords = c("x", "y"),
-  crs = 4326
-)
-
-#  pass spatial parameters
+```{r} set spatial parameters
 sigma.sq <- 1
 tau.sq <- 0.1
 phi <- 1 / 3
 alpha <- 1
-
-range <- log(10)^(1 / alpha) * phi
-
-distMatrix <- as.matrix(dist(loc))
-R <- exp((-1) * (distMatrix / phi)^alpha)
 ```
 
 ```{r}
+# #  generate point data
+# n <- 200
+# loc <- cbind(runif(n, 0, 1), runif(n, 0, 1))
+# colnames(loc) <- c("x", "y")
+
+# sf <- st_as_sf(
+#   as.data.frame(loc),
+#   coords = c("x", "y"),
+#   crs = 4326
+# )
+
+# #  pass spatial parameters
+
+
+# range <- log(10)^(1 / alpha) * phi  # aonde é usado?
+
+# # distMatrix <- as.matrix(dist(loc))
+
+# R <- exp((-1) * (distMatrix / phi)^alpha)
+# diag(R) <- 1
+# nloc <- dim(loc)[1]
+# C <- sigma.sq * R
+
+# D <- chol(C)
+# rnorm_n.obs <- rnorm(n)
+# w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
+
+# X <- as.matrix(cbind(1, rnorm(nloc))) ## X = intercept + covariate
+
+# B <- as.matrix(c(1, 5))
+# p <- length(B)
+
+# y <- rnorm(nloc, X %*% B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
+
+```
+
+```{r}
+
+library(CARBayesdata)
+data(GGHB.IZ)
+data(respiratorydata) # dados usados pelo Lucas
+
+sf <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]
+loc = st_coordinates(st_centroid(sf))
+n = nrow(loc)
+
+# distMatrix <- hdist_sf(loc_sf)
+distMatrix <- as.matrix(dist(loc))
+
+
+R <- exp((-1) * (distMatrix / phi)^alpha)
 diag(R) <- 1
 nloc <- dim(loc)[1]
 C <- sigma.sq * R
@@ -63,12 +97,16 @@ D <- chol(C)
 rnorm_n.obs <- rnorm(n)
 w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
 
-X <- as.matrix(cbind(1, rnorm(nloc))) ## X = intercept + covariate
 
 B <- as.matrix(c(1, 5))
 p <- length(B)
 
-y <- rnorm(nloc, X %*% B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
+y <- respiratorydata$observed
+X <- as.matrix(cbind(1, respiratorydata$incomedep)) ## X = intercept + covariate
+E = respiratorydata$expected  # offset
+
+# y ~ pois(μi)
+# log(μ_i​) = log(E_i​) + β_0 ​+ β_1 * ​incomedep_i ​+ f_i​
 
 ```
 
@@ -83,6 +121,7 @@ res1 <- blockNNGP(
   sf,
   y,
   X,
+  E,
   w,
   dir.save,
   n.partition,

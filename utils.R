@@ -165,13 +165,13 @@ get_blocksdata = function(loc, sf, n.blocks, num.nb) {
   if (n.blocks %in% c(8, 16)) indr <- 4
   if (n.blocks %in% c(32, 64)) indr <- 8
   if (n.blocks == 128) indr <- 16
-
-  indexsort1 <- NULL
-
-  for (j in 1:(n.blocks / indr)) {
-    h1 <- new.locblocks[(((j - 1) * indr) + 1):(j * indr), ]
-    indh1 <- sort.int(h1[, 1], index.return = TRUE)
-    indexsort1 <- c(indexsort1, indh1$ix + ((j - 1) * indr))
+  
+  blocksr 	<- 1:n.blocks
+  indexsort1	<- NULL
+  for(j in 1: (n.blocks/indr)){
+    h1 		<- new.locblocks[(((j-1)*indr)+1):(j*indr), ]
+    indh1 		<- sort.int(h1[,1], index.return = TRUE)
+    indexsort1 	<- c(indexsort1, indh1$ix+ ((j-1)*indr))
   }
 
   blocks01 <- blocks
