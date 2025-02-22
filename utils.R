@@ -131,7 +131,6 @@ hdist_sf <- function(locVec) {
   return(distMatrix)
 }
 
-
 get_blocksdata = function(loc, sf, n.blocks, num.nb) {
   nloc <- dim(loc)[1]
   blocks <- NULL
@@ -165,13 +164,13 @@ get_blocksdata = function(loc, sf, n.blocks, num.nb) {
   if (n.blocks %in% c(8, 16)) indr <- 4
   if (n.blocks %in% c(32, 64)) indr <- 8
   if (n.blocks == 128) indr <- 16
-  
-  blocksr 	<- 1:n.blocks
-  indexsort1	<- NULL
-  for(j in 1: (n.blocks/indr)){
-    h1 		<- new.locblocks[(((j-1)*indr)+1):(j*indr), ]
-    indh1 		<- sort.int(h1[,1], index.return = TRUE)
-    indexsort1 	<- c(indexsort1, indh1$ix+ ((j-1)*indr))
+
+  blocksr <- 1:n.blocks
+  indexsort1 <- NULL
+  for (j in 1:(n.blocks / indr)) {
+    h1 <- new.locblocks[(((j - 1) * indr) + 1):(j * indr), ]
+    indh1 <- sort.int(h1[, 1], index.return = TRUE)
+    indexsort1 <- c(indexsort1, indh1$ix + ((j - 1) * indr))
   }
 
   blocks01 <- blocks
@@ -181,7 +180,7 @@ get_blocksdata = function(loc, sf, n.blocks, num.nb) {
   }
   #  build the adjacency matrix,
   sortloc <- new.locblocks[indexsort1, ]
-  dist.mat <- as.matrix(dist(sortloc))  
+  dist.mat <- as.matrix(dist(sortloc))
 
   AdjMatrix <- matrix(0, n.blocks, n.blocks)
 
@@ -206,7 +205,6 @@ get_blocksdata = function(loc, sf, n.blocks, num.nb) {
     )
   )
 }
-
 
 get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf) {
   ### creating new indexes
@@ -258,3 +256,35 @@ get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf) {
   )
 }
 
+get_HGPdata = function(loc, sf, n.blocks, num.nb ) {
+  block_struc = get_blocksdata(loc, sf, n.blocks, num.nb)
+  ind1 = block_struc$ind1
+  AdjMatrix = block_struc$AdjMatrix
+  blocks <- block_struc$blocks
+
+  blocks <- blocks[(ind1$ix)]
+  sf <- sf[(ind1$ix), ]
+
+  precMatrixData = get_precMatrixData(n.blocks, blocks, AdjMatrix, sf)
+
+  return(
+    list(
+      model = inla.rgeneric.define(
+        inla.rgeneric.blockNNGP.model,
+        W = precMatrixData$W,
+        n = n,
+        n.blocks = n.blocks,
+        nb = precMatrixData$nb,
+        ind_obs1 = precMatrixData$ind_obs1,
+        num1 = precMatrixData$num1,
+        indb = precMatrixData$indb,
+        coords.D = precMatrixData$coords.D
+      ),
+      W = precMatrixData$W,
+      nb = precMatrixData$nb,
+      ind_obs1 = precMatrixData$ind_obs1,
+      indb = precMatrixData$indb,
+      coords.D = precMatrixData$coords.D
+    )
+  )
+}

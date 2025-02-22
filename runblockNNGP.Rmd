@@ -1,12 +1,12 @@
 ```{r}
 rm(list = ls())
-dir.save = getwd()
+dir.save <- getwd()
 set.seed(1232)
 
 setwd("C:/Users/Gabriel/Documents/Gabriel/IC/HGP-INLA/")
 
-source("blockNNGPfunctionREGULAR.R")
-source("blockNNGPfunctionIRREGULAR.R")
+# source("blockNNGPfunctionREGULAR.R")
+# source("blockNNGPfunctionIRREGULAR.R")
 source("NNGPfunction.R")
 source("blockNNGPrgeneric.R")
 source("NNGPrgeneric.R")
@@ -51,7 +51,6 @@ alpha <- 1
 
 # #  pass spatial parameters
 
-
 # range <- log(10)^(1 / alpha) * phi  # aonde é usado?
 
 # # distMatrix <- as.matrix(dist(loc))
@@ -81,29 +80,12 @@ data(GGHB.IZ)
 data(respiratorydata) # dados usados pelo Lucas
 
 sf <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]
-loc = st_coordinates(st_centroid(sf))
-n = nrow(loc)
-
-# distMatrix <- hdist_sf(loc_sf)
-distMatrix <- as.matrix(dist(loc))
-
-
-R <- exp((-1) * (distMatrix / phi)^alpha)
-diag(R) <- 1
-nloc <- dim(loc)[1]
-C <- sigma.sq * R
-
-D <- chol(C)
-rnorm_n.obs <- rnorm(n)
-w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
-
-
-B <- as.matrix(c(1, 5))
-p <- length(B)
+loc <- st_coordinates(st_centroid(sf))
+n <- nrow(loc)
 
 y <- respiratorydata$observed
 X <- as.matrix(cbind(1, respiratorydata$incomedep)) ## X = intercept + covariate
-E = respiratorydata$expected  # offset
+E <- respiratorydata$expected # offset
 
 # y ~ pois(μi)
 # log(μ_i​) = log(E_i​) + β_0 ​+ β_1 * ​incomedep_i ​+ f_i​
@@ -112,21 +94,62 @@ E = respiratorydata$expected  # offset
 
 
 ```{r}
+# retrieve model
 n.partition <- 8
 n.blocks <- n.partition^2
 num.nb <- 2
-res1 <- blockNNGP(
-  'irregular',
-  loc,
-  sf,
-  y,
-  X,
-  E,
-  w,
-  dir.save,
-  n.partition,
-  n.blocks,
-  num.nb
+
+HGPdata <- get_HGPdata(loc, sf, n.blocks, num.nb) # blocks é definido dentro de get_HGPdata
+```
+
+
+```{r}
+### %%%%%%%%%%%%%%%%%%%%%%% END  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+## run model with INLA
+## set the blockNNGP as latent effect
+blockNNGP.model <- HGPdata$model
+
+# response variable and covariates FOR POINT DATA
+data1 <- data.frame(y = y, x = X[, 2])
+data1$idx <- 1:nrow(data1)
+
+# formula to fit the blockNNGP model
+# f() ensure that the latent effect is the blockNNGP
+f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
+
+# inla function to fit the model
+# The user can change the family and priors here.
+resf <- inla(
+  f.blockNNGP,
+  data = as.data.frame(data1),
+  family = "poisson",
+  E = E
 )
-# summary(res1)
+
+print(names(resf$marginals.hyperpar))
+
+# Recovering the posterior mean estimation of nugget, marginal variance and phi parameters.
+tau.est <- inla.emarginal(function(x) 1 / x, resf$marginals.hyperpar[[1]])
+sigmasq.est <- inla.emarginal(
+  function(x) exp(-x),
+  resf$marginals.hyperpar[[2]]
+)
+# phi.est <- inla.emarginal(
+#   function(x) 1 - 1 / (1 + exp(x)),
+#   resf$marginals.hyperpar[[3]]
+# )
+# summary.theta <- c(tau.est, sigmasq.est, phi.est)
+# print(c("tau.est", "sigmasq.est", "phi.est"))
+
+summary.theta <- c(tau.est, sigmasq.est)
+print(c("tau.est", "sigmasq.est")) # supposed to be sigmasq.est and rho.est?
+
+print(summary.theta)
+
+## posterior mean of spatial random effects
+est.w <- resf$summary.random$idx$mean
+
+print(resf)
+# return(resf)
 ```

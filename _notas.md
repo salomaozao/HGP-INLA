@@ -11,6 +11,17 @@
         -   [ OK ] Separar matriz de precisão
         -   [ OK ] fazer uma função generatemodel()
 
+-    Correções
+
+    - [ ] vc precisa pegar os dados do respiratory e unir com o GGHB.IZ; ali ficarão tanto as variaveis resposta e covariáveis como a estrutura do mapa
+    - [ OK ] Implementar uma função para gerar a vizinha e rgeneric
+    - [ ] esse blockNNGPIrregular.R essa parte do INLA (linha 86 em diante) vai pro main
+    - [ OK ] pq precisa desse w fa linha 98 (runblockNNGP.Rmd)? Ele serve pra que?
+    - [ ] Resolver problemas com escopo das variáveis na parte do modelo do INLA
+
+
+
+
 -   Implementações
 
     -   [ ] Implementação de dados de área
@@ -32,12 +43,16 @@
 
 
             -   Configurar o offset no INLA
+    -   [ OK? ] Ajustar os dados do CAR para regressão Poisson
 
 -   Ajustes:
 
     -   [ OK ] exigir sf no hdist_sf
     -   [ OK ] usar dist euclidiana na blocagem
 
+
+- Documentação
+    - [ ] Registrar os resultados (dados da Zaida com/sem NNGP; Dados do Lucas)
 # Commits:
 
 ### Implementado função generateHGP para gerar o modelo

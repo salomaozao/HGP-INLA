@@ -28,17 +28,17 @@ blockNNGP = function(
   y,
   X,
   E = NULL,
-  w.obs,
+  # w.obs,
   dir.save,
   n.partitions,
   n.blocks,
   num.nb
 ) {
-  inla.setOption(num.threads = "2:1") # 4 threads principais + 1 para hyper
+  # inla.setOption(num.threads = "2:1") # 4 threads principais + 1 para hyper // vale a pena dar uma olhada nas opções do INLA
   if (!'sf' %in% class(sf)) stop("sf is not a spatial data frame.")
 
   # if this function is defined in utils, the parameters must be function(n.blocks, sf, y, X, w.obs, rnorm_n.obs, num.nb)
-  get_HGPdata = function(n.blocks, sf) {
+  get_HGPdata = function(n.blocks, sf, y, X, sf, num.nb) {
     block_struc = get_blocksdata(loc, sf, n.blocks, num.nb)
     ind1 = block_struc$ind1
     AdjMatrix = block_struc$AdjMatrix
@@ -46,10 +46,8 @@ blockNNGP = function(
 
     y <- y[(ind1$ix)]
     X <- X[(ind1$ix), ]
-    w <- w.obs[(ind1$ix)]
     blocks <- blocks[(ind1$ix)]
     sf <- sf[(ind1$ix), ]
-    rnorm_n.obs <- rnorm_n.obs[(ind1$ix)]
 
     precMatrixData = get_precMatrixData(n.blocks, blocks, AdjMatrix, sf)
 
@@ -76,11 +74,10 @@ blockNNGP = function(
   }
 
   HGPdata = get_HGPdata(n.blocks, sf) # blocks é definido dentro de get_HGPdata
-  W = HGPdata$W
-  nb = HGPdata$nb
-  ind_obs1 = HGPdata$ind_obs1
-  indb = HGPdata$indb
-  coords.D = HGPdata$coords.D
+  # nb = HGPdata$nb
+  # ind_obs1 = HGPdata$ind_obs1
+  # indb = HGPdata$indb
+  # coords.D = HGPdata$coords.D
 
   ###%%%%%%%%%%%%%%%%%%%%%%% END  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -122,7 +119,7 @@ blockNNGP = function(
   # print(c("tau.est", "sigmasq.est", "phi.est"))
 
   summary.theta <- c(tau.est, sigmasq.est)
-  print(c("tau.est", "sigmasq.est"))  # supposed to be sigmasq.est and rho.est?
+  print(c("tau.est", "sigmasq.est")) # supposed to be sigmasq.est and rho.est?
 
   print(summary.theta)
 
