@@ -126,7 +126,7 @@ resf <- inla(
   E = E
 )
 
-print(names(r\esf$marginals.hyperpar))
+print(names(resf$marginals.hyperpar))
 
 # Recovering the posterior mean estimation of nugget, marginal variance and phi parameters.
 tau.est <- inla.emarginal(function(x) 1 / x, resf$marginals.hyperpar[[1]])
