@@ -131,6 +131,7 @@ hdist_sf <- function(locVec) {
   return(distMatrix)
 }
 
+
 get_blocksdata = function(loc, sf, n.blocks, num.nb) {
   nloc <- dim(loc)[1]
   blocks <- NULL
@@ -165,8 +166,8 @@ get_blocksdata = function(loc, sf, n.blocks, num.nb) {
   if (n.blocks %in% c(32, 64)) indr <- 8
   if (n.blocks == 128) indr <- 16
 
-  blocksr <- 1:n.blocks
   indexsort1 <- NULL
+
   for (j in 1:(n.blocks / indr)) {
     h1 <- new.locblocks[(((j - 1) * indr) + 1):(j * indr), ]
     indh1 <- sort.int(h1[, 1], index.return = TRUE)
@@ -206,7 +207,8 @@ get_blocksdata = function(loc, sf, n.blocks, num.nb) {
   )
 }
 
-get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf) {
+
+get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf, isPointData) {
   ### creating new indexes
   newindex <- NULL
   nb <- matrix(NA, n.blocks, 1)
@@ -232,7 +234,11 @@ get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf) {
   }
 
   ## mask for precision-blockNNGP
-  coords.D <- hdist_sf(sf)
+  if (isPointData) {
+    coords.D <- rdist(st_coordinates(st_centroid(sf)))
+  } else {
+    coords.D <- hdist_sf(sf)
+  }
   C1 <- exp(-0.04 * coords.D) # for sparseMatrix
 
   invC <- PrecblockNNGP(n, n.blocks, C1, nb, ind_obs1, num1, indb) # create precision matrix
@@ -256,16 +262,36 @@ get_precMatrixData = function(n.blocks, blocks, AdjMatrix, sf) {
   )
 }
 
-get_HGPdata = function(loc, sf, n.blocks, num.nb ) {
+get_HGPdata = function(
+  loc,
+  sf,
+  y,
+  X,
+  n.blocks,
+  num.nb,
+  isPointData = FALSE,
+  alpha = 1
+) {
+  if (!"sf" %in% class(sf)) stop("sf is not a spatial data frame.")
+
   block_struc = get_blocksdata(loc, sf, n.blocks, num.nb)
   ind1 = block_struc$ind1
   AdjMatrix = block_struc$AdjMatrix
   blocks <- block_struc$blocks
 
+  # bad code?
+  y <<- y[(ind1$ix)]
+  X <<- X[(ind1$ix), ]
   blocks <- blocks[(ind1$ix)]
   sf <- sf[(ind1$ix), ]
 
-  precMatrixData = get_precMatrixData(n.blocks, blocks, AdjMatrix, sf)
+  precMatrixData = get_precMatrixData(
+    n.blocks,
+    blocks,
+    AdjMatrix,
+    sf,
+    isPointData
+  )
 
   return(
     list(
@@ -280,7 +306,6 @@ get_HGPdata = function(loc, sf, n.blocks, num.nb ) {
         indb = precMatrixData$indb,
         coords.D = precMatrixData$coords.D
       ),
-      W = precMatrixData$W,
       nb = precMatrixData$nb,
       ind_obs1 = precMatrixData$ind_obs1,
       indb = precMatrixData$indb,

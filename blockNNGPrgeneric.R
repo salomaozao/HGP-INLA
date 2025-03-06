@@ -16,11 +16,17 @@
 # blockNNGP.model <- inla.rgeneric.define(inla.rgeneric.blockNNGP.model, W = W, n= n, n.blocks= n.blocks,nb =nb,ind_obs1=ind_obs1,num1=num1,indb=indb,coords.D=coords.D)
 
 "inla.rgeneric.blockNNGP.model" <- function(
-    cmd = c(
-      "graph", "Q", "mu", "initial", "log.norm.const",
-      "log.prior", "quit"
-    ),
-    theta = NULL) {
+  cmd = c(
+    "graph",
+    "Q",
+    "mu",
+    "initial",
+    "log.norm.const",
+    "log.prior",
+    "quit"
+  ),
+  theta = NULL
+) {
   #  interpret.theta function will take the parameters in the internal scale and return the marginal variance and phi parameters:
   interpret.theta <- function() {
     return(
@@ -36,7 +42,6 @@
 
     return(Diagonal(nrow(W), x = 1) + W)
   }
-
 
   # meancov_nn function computes the matrices Bbk and Fbk for each block k.
   meancov_nn <- function(Sigma, ind_obs, ind_neigblocks, indnum) {
@@ -66,7 +71,12 @@
 
     #    system.time(
     for (j in 2:n.blocks) {
-      ress <- meancov_nn(Sigma, indb[[j - 1]][[1]], indb[[j - 1]][[2]], indb[[j - 1]][[4]])
+      ress <- meancov_nn(
+        Sigma,
+        indb[[j - 1]][[1]],
+        indb[[j - 1]][[2]],
+        indb[[j - 1]][[4]]
+      )
       Fs_1[(nb[j - 1] + 1):(nb[j]), (nb[j - 1] + 1):(nb[j])] <- ress$invFbi
       Bb[(nb[j - 1] + 1):(nb[j]), ] <- ress$Bstar_bi
     }
@@ -80,29 +90,15 @@
     return(invCs)
   }
 
-
-
   # Q function defines the precision matrix which is defined in a similar way of W. Here we define the precision matrix of the blockNNGP latent effect.
   Q <- function() {
     require(Matrix)
 
     param <- interpret.theta()
 
-    ###########
-    ## Matérn
-    ###########
-    #nu <- 0.5
-    # R <- (sqrt(2*nu)*coords.D/param$phi)^nu/(2^(nu-1)*gamma(nu))*besselK(x=sqrt(2*nu)*coords.D/param$phi, nu=nu)
-    
-
-
-    ###########
     ## PowExp
-    ###########
     alpha <- 1
     R <- exp((-1) * (coords.D / param$phi)^alpha)
-
-
     diag(R) <- 1
     C <- param$sigmasq * R
 
@@ -122,9 +118,11 @@
   # log.prior function computes the pdf of prior distributions for sigmasq and phi. In particular, for the marginal variance we set a gamma distribution  with parameters 1 and 0.00005,and for phi=2/range we set a uniform distribution on (a,b), where a and b are associated to the minimum and maximum distance between locations, in this case a=1 and b=30. extra terms that appear in the definition of the log-density of the prior are due to the change of variable involved. INLA works with (theta1, theta2)  internally, but the prior is set on (sigmasq, phi).
   log.prior <- function() {
     param <- interpret.theta()
-    res <- dgamma(param$sigmasq, 1, 5e-05, log = TRUE) + log(param$sigmasq) +
-       #(2*log(1/1)) + log(param$phi-1) + log(30 - param$phi)
-       log(param$phi) + log(1 - param$phi)
+    res <- dgamma(param$sigmasq, 1, 5e-05, log = TRUE) +
+      log(param$sigmasq) +
+      #(2*log(1/1)) + log(param$phi-1) + log(30 - param$phi)
+      log(param$phi) +
+      log(1 - param$phi)
     return(res)
   }
 

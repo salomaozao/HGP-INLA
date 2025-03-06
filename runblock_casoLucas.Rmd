@@ -1,0 +1,106 @@
+```{r} INIT
+rm(list = ls())
+set.seed(1232)
+
+source("NNGPfunction.R")
+source("blockNNGPrgeneric.R")
+source("NNGPrgeneric.R")
+source("Irregblock.R")
+source("utils.R")
+
+library(INLA)
+library(fields)
+library(lattice)
+library(akima)
+library(Matrix)
+library(slam)
+library(igraph)
+library(coda)
+library(MBA)
+library(mvtnorm)
+library(ggforce)
+library(Rcpp)
+library(tidyverse)
+library(raster)
+library(sf)
+
+# dados usados pelo Lucas
+library(CARBayesdata)
+data(GGHB.IZ)
+data(respiratorydata)
+```
+
+```{r} Get aereal mixed data and extract features
+
+sf <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]
+loc <- st_coordinates(st_centroid(sf))
+n <- nrow(loc)
+
+y <- respiratorydata$observed
+X <- as.matrix(cbind(1, respiratorydata$incomedep)) ## X = intercept + covariate
+E <- respiratorydata$expected # offset
+
+# y ~ pois(μi)
+# log(μ_i​) = log(E_i​) + β_0 ​+ β_1 * ​incomedep_i ​+ f_i​
+```
+
+
+```{r} Generate HGP model
+n.partition <- 8
+n.blocks <- n.partition^2
+num.nb <- 2
+
+alpha <- 0.7
+
+HGPdata <- get_HGPdata(
+  loc,
+  sf,
+  y,
+  X,
+  n.blocks,
+  num.nb,
+  alpha = alpha
+)
+
+nb <- HGPdata$nb
+ind_obs1 <- HGPdata$ind_obs1
+indb <- HGPdata$indb
+coords.D <- HGPdata$coords.D
+blockNNGP.model <- HGPdata$model
+```
+
+```{r} Run model with INLA'
+data1 <- data.frame(y = y, x = X[, 2])
+data1$idx <- 1:nrow(data1)
+
+f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
+
+resf <- inla(
+  f.blockNNGP,
+  data = as.data.frame(data1),
+  family = "poisson",
+  E = E
+)
+
+# Theta1 = (log(1/σ²))  ! supposed to be sigma not sigmasq?
+sigmasq.est <- inla.emarginal(
+  function(x) exp(-x),
+  resf$marginals.hyperpar[[1]]
+)
+
+# Theta2 = logit(ϕ) -> rho = log(10)^1/ν * φ
+rho.est <- inla.emarginal(
+  function(x) log(10)^(1 / (alpha)) * (1 - 1 / (1 + exp(x))),
+  resf$marginals.hyperpar[[2]]
+)
+
+# rho.est <- log(10)^(1 / (0.7)) * phi.est
+# rho.est <- log(10)^(1 / (alpha)) * phi.est
+
+# Resultado transformado
+cat("σ²:", sigmasq.est, "\n") # deve ser 0.19
+cat("ϕ :", rho.est, "\n") # deve ser 2.25
+
+
+print(resf)
+```
