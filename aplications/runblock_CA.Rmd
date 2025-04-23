@@ -1,0 +1,199 @@
+```{r}
+rm(list = ls())
+
+# setwd("C:/Users/Gabriel/Documents/Gabriel/IC/R/fix_nu")
+# getwd()
+
+source("blockNNGPrgeneric.R")
+source("Irregblock.R")
+source("utils.R")
+
+library(terra)
+library(sf)
+library(rnaturalearth)
+library(dplyr)
+# library(ggplot2)
+library(tidyr)
+library(INLA)
+library(stats)
+require(Matrix)
+
+```
+
+```{r} Get data
+# ======== Aereal data ========
+# Get world PM2.5 concentration
+world_data <- c(
+  rast("./CA_data/aereal_PM25_CA_2010/aereal_PM25_CA_2010.tif"),
+  rast("./CA_data/aereal_PM25_CA_2011/aereal_PM25_CA_2011.tif"),
+  rast("./CA_data/aereal_PM25_CA_2012/aereal_PM25_CA_2012.tif")
+)
+# plot(world_data)
+
+# Get california shapefile
+shapefile <- ne_states(
+  country = "United States of America",
+  returnclass = "sf"
+)
+
+shapefile <- shapefile[shapefile$name == "California", ]
+
+# ======== Point data ========
+fileList <- list.files(
+  path = "./CA_data/point_PM25_CA_2012", #
+  pattern = "\\.csv$",
+  full.names = TRUE
+)
+
+# Get California point Data
+pointData <- lapply(fileList, function(file) {
+  f <- st_read(
+    file,
+    options = c(
+      "X_POSSIBLE_NAMES=Site.Longitude",
+      "Y_POSSIBLE_NAMES=Site.Latitude"
+    ),
+    crs = 4326
+  )
+  return(f)
+})
+
+```
+
+```{r} Handling aereal data
+shapefile <- st_transform(shapefile, crs(world_data)) # sync CRS
+aerealData <- crop(world_data, shapefile) # crop to fit (?)
+aerealData <- mask(aerealData, shapefile) # mask shapefile with data
+aerealData <- mean(aerealData, na.rm = TRUE) # get mean
+aerealData_sf <- st_as_sf(as.polygons(aerealData$mean))
+#  ! use pipe operator
+```
+
+```{r} Handling point data
+#  Get mean values
+#  Cada estação possuí várias medidas ao longo do ano, o que faremos é tirar a média de todas as medidas dentro de um ano, e então tirar a média de todos os anos, assim, cada estação terá apenas uma medida, que é a média total
+
+#  "Daily.Mean.PM2.5.Concentration", "Site.Latitude", "Site.Longitude"
+annual_means <- lapply(pointData, function(df) {
+  df$Daily.Mean.PM2.5.Concentration <- as.numeric(as.character(
+    df$Daily.Mean.PM2.5.Concentration
+  ))
+
+  # Calcular médias por estação
+  result <- df %>%
+    group_by(Site.Latitude, Site.Longitude, Site.ID) %>%
+    summarise(
+      Annual_Mean = mean(Daily.Mean.PM2.5.Concentration, na.rm = TRUE),
+      Count = sum(!is.na(Daily.Mean.PM2.5.Concentration)),
+      .groups = "drop"
+    )
+
+  # Converter para objeto sf com geometria
+  if (inherits(df, "sf")) {
+    result <- st_as_sf(
+      result,
+      coords = c("Site.Longitude", "Site.Latitude"),
+      crs = st_crs(df)
+    )
+  } else {
+    # Se não for objeto sf, criar geometria manualmente
+    result <- st_as_sf(
+      result,
+      coords = c("Site.Longitude", "Site.Latitude"),
+      crs = 4326
+    )
+  }
+
+  return(result)
+})
+
+
+all_stations <- do.call(rbind, annual_means)
+
+#  Get total mean
+pointData_df <- all_stations %>%
+  group_by(Site.ID) %>%
+  summarise(
+    mean = mean(Annual_Mean, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+```
+
+```{r} Join aereal and point data to get mixed data
+mixedData <- bind_rows(
+  aerealData = select(aerealData_sf, mean, geometry),
+  pointData = select(pointData_df, mean, geometry),
+  .id = "type"
+)
+```
+
+```{r} Plot mixed data and check
+# ggplot() +
+#   geom_sf(data = mixedData, aes(color = mean, fill = mean)) +
+#   labs(title = "") +
+#   theme_minimal()
+
+# plot(annual_means[[1]]$Count)
+
+# cat(
+#   "Qtd. de bservações: \n Ano 1:",
+#   nrow(annual_means[[1]]),
+#   "\nAno 2:",
+#   nrow(annual_means[[2]]),
+#   "\nAno 3:",
+#   nrow(annual_means[[3]]),
+#   "\n"
+# )
+# cat(
+#   "Há",
+#   length(unique(pointData_df$geometry)),
+#   "estações de coleta e",
+#   nrow(aerealData_sf),
+#   "níveis de dados de área ->",
+#   nrow(mixedData)
+# )
+```
+
+
+```{r} Get model
+n.partition <- 4
+n.blocks <- n.partition^2
+num.nb <- 2
+
+sf = st_transform(st_sf(mixedData$geometry), 4326)
+sf <- st_make_valid(sf)
+
+# n <- nrow(sf)
+HGPdata <- get_HGPdata(
+  sf,
+  n.blocks,
+  num.nb,
+  alpha = 0.8
+)
+
+y <- mixedData$mean[HGPdata$order]
+
+# View(mixedData)
+```
+
+
+```{r} Run INLA
+# 1. Organizar os dados
+data1 <- data.frame(y = mixedData$mean)
+data1$idx <- 1:nrow(data1)
+
+# 2. Modelo de efeito aleatório espacial
+f.spatial <- y ~ 1 + f(idx, model = HGPdata$model)
+
+# 3. Rodar INLA
+resf <- inla(
+  f.spatial,
+  data = as.data.frame(data1),
+  family = "gaussian", # Distribuição Normal
+  # verbose = TRUE
+)
+
+summary(resf)
+```
+
