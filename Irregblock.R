@@ -6,7 +6,7 @@
 #***** n.blocks = 2^2, 2^3,2^4,2^5,2^6,2^7
 #########################################################
 
-part_v = function(treenew, level_k, num_block, blocks,loc) {
+part_v = function(treenew, level_k, num_block, blocks, loc) {
   k <- level_k[1]
   vb <- treenew[k, ]$x
   indblock <- which(loc[, 1] <= vb)
@@ -29,7 +29,7 @@ part_v = function(treenew, level_k, num_block, blocks,loc) {
   return(blocks)
 }
 
-part_v2 = function(treenew, level_k, num_block, blocks,loc) {
+part_v2 = function(treenew, level_k, num_block, blocks, loc) {
   k <- level_k[1]
   vb <- treenew[k, ]$x
   indblock1 <- which(loc[, 1] > vb)
@@ -41,7 +41,7 @@ part_v2 = function(treenew, level_k, num_block, blocks,loc) {
 }
 
 
-part_h2 = function(treenew, level_k, num_block, blocks,loc) {
+part_h2 = function(treenew, level_k, num_block, blocks, loc) {
   k <- level_k[1]
   hb <- treenew[k, ]$y
   indblock1 <- which(loc[, 2] > hb)

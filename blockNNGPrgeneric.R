@@ -6,7 +6,7 @@
 # In order to define the block-NNGP latent effect in INLA, we need to define the next functions:
 # The mean of the latent effects: mu
 # The precision of the latent effects: Q(theta)
-# A ‘graph’, with a binary representation of the precision matrix: W
+# A 'graph', with a binary representation of the precision matrix: W
 # The initial values of the parameters.
 # A log-normalizing constant.
 # The log-prior of theta.
@@ -14,6 +14,10 @@
 ## Arguments:
 ##
 # blockNNGP.model <- inla.rgeneric.define(inla.rgeneric.blockNNGP.model, W = W, n= n, n.blocks= n.blocks,nb =nb,ind_obs1=ind_obs1,num1=num1,indb=indb,coords.D=coords.D)
+
+#  ================================
+
+# Any function defined inside the inla.rgeneric.blockNNGP.model function (like Q(), mu(), graph(), etc.) does not need parameters in its definition because all of its variables are defined inside the scope of the model (defined in get_HGPdata())
 
 "inla.rgeneric.blockNNGP.model" <- function(
   cmd = c(
@@ -27,26 +31,30 @@
   ),
   theta = NULL
 ) {
-  a = 0
-  b = 10
   #  interpret.theta function will take the parameters in the internal scale and return the marginal variance and phi parameters:
   interpret.theta <- function() {
     return(
       list(
         sigmasq = exp(-theta[1L]),
-        phi = b - (b-a) / (1 + exp(theta[2L]))
+        phi = b - (b - a) / (1 + exp(theta[2L]))
       ) # b - (b-a)/(1+exp(theta2))
     )
   }
   # the graph function represents the entries of the precision matrix that are non-zero. W  must be passed as a sparse matrix (as defined in package Matrix) and the returned matrix must be sparse too.
   graph <- function() {
     require(Matrix)
-
     return(Diagonal(nrow(W), x = 1) + W)
   }
 
   # meancov_nn function computes the matrices Bbk and Fbk for each block k.
   meancov_nn <- function(Sigma, ind_obs, ind_neigblocks, indnum) {
+    stopifnot(
+      is.matrix(Sigma),
+      is.numeric(ind_obs),
+      is.numeric(ind_neigblocks),
+      is.numeric(indnum)
+    )
+
     invC_nbi <- chol2inv(chol(Sigma[ind_neigblocks, ind_neigblocks]))
     B_bi <- (Sigma[ind_obs, ind_neigblocks]) %*% invC_nbi
     F_bi <- Sigma[ind_obs, ind_obs] - (B_bi %*% Sigma[ind_neigblocks, ind_obs])
@@ -62,7 +70,7 @@
 
   # PrecNNGP function computes the precision matrix of blockNNGP
   PrecblockNNGP <- function(nloc, n.blocks, Sigma, nb, ind_obs1, num1, indb) {
-    Fs_1 <- matrix(0, nloc, nloc)  #  ! error is here
+    Fs_1 <- matrix(0, nloc, nloc) #  ! error is here
     Bb <- matrix(0, nloc, nloc)
 
     Fs_1[1:nb[1], 1:nb[1]] <- chol2inv(chol(Sigma[ind_obs1, ind_obs1]))
@@ -89,21 +97,24 @@
 
     invCs <- crossprod(Bbb, Fs_11) %*% Bbb
 
+    print(b)
     return(invCs)
   }
 
   # Q function defines the precision matrix which is defined in a similar way of W. Here we define the precision matrix of the blockNNGP latent effect.
   Q <- function() {
-    require(Matrix)
-
+    # Get hyperparameters from internal representation
     param <- interpret.theta()
-
-    ## PowExp
+    print(b)
+    # Compute correlation matrix using power exponential function
     nu <- alpha
     R <- exp((-1) * (coords.D / param$phi)^nu)
     diag(R) <- 1
+
+    # Scale by marginal variance
     C <- param$sigmasq * R
 
+    # Compute and return precision matrix
     return(PrecblockNNGP(n, n.blocks, C, nb, ind_obs1, num1, indb))
   }
 
@@ -119,9 +130,13 @@
 
   # log.prior function computes the pdf of prior distributions for sigmasq and phi. In particular, for the marginal variance we set a gamma distribution  with parameters 1 and 0.00005,and for phi=2/range we set a uniform distribution on (a,b), where a and b are associated to the minimum and maximum distance between locations, in this case a=1 and b=30. extra terms that appear in the definition of the log-density of the prior are due to the change of variable involved. INLA works with (theta1, theta2)  internally, but the prior is set on (sigmasq, phi).
   log.prior <- function() {
-    param <- interpret.theta()
-    res <- dgamma(param$sigmasq, 1, 5e-05, log = TRUE) + log(param$sigmasq) +
-      -2*(log(b-a) - log(b-param$phi)) + log((b-a)/(b-param$phi)-1)
+    GAMMA_RATE = 5e-05
+
+    param <- interpret.theta() #?
+    res <- dgamma(param$sigmasq, 1, GAMMA_RATE, log = TRUE) +
+      log(param$sigmasq) +
+      -2 * (log(b - a) - log(b - param$phi)) +
+      log((b - a) / (b - param$phi) - 1)
     return(res)
   }
 

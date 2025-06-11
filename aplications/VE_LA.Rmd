@@ -1,0 +1,262 @@
+```{r imports}
+rm(list = ls())
+
+# setwd("C:/Users/Gabriel/Documents/Gabriel/IC/R/")
+
+source("blockNNGPrgeneric.R")
+source("Irregblock.R")
+source("utils.R")
+
+library(terra)
+library(sf)
+library(rnaturalearth)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+require(Matrix)
+# library(tigris)
+library(INLA)
+
+```
+
+```{r AEREAL-DATA cache=TRUE}
+# Get world PM2.5 concentration
+world_data <- c(
+  rast("./CA_data/aereal_PM25_CA_2010/aereal_PM25_CA_2010.tif"),
+  rast("./CA_data/aereal_PM25_CA_2011/aereal_PM25_CA_2011.tif"),
+  rast("./CA_data/aereal_PM25_CA_2012/aereal_PM25_CA_2012.tif")
+)
+
+#  Get shapefile (requires internet) ==============
+# Ventura County, VE
+# ventura <- tracts(state = "CA", county = "Ventura", year = 2020)
+ventura <- st_read("CA_data/VE_shp/VE.shp")
+
+# Los Angeles County, CA
+# los_angeles <- tracts(state = "CA", county = "Los Angeles", year = 2020)
+los_angeles <- st_read("CA_DATA/LA_shp/LA.shp")
+
+ventura$county <- "Ventura"
+los_angeles$county <- "Los Angeles"
+
+# Junta os dois shapefiles
+shapefile <- rbind(ventura, los_angeles)
+
+
+# shapefile <- shapefile[shapefile$name == "California", ]
+
+# worldData is spatRaster
+shapefile <- st_transform(shapefile, crs(world_data)) # sync CRS
+aerealData <- crop(world_data, shapefile) # crop to fit (?)
+aerealData <- mask(aerealData, shapefile) # mask shapefile with data
+aerealData <- mean(aerealData, na.rm = TRUE) # get mean
+
+aerealData_sf <- st_as_sf(as.polygons(aerealData$mean))
+#  ! use pipe operator
+```
+
+```{r POINT-DATA cache=TRUE}
+fileList <- list.files(
+  path = "./CA_data/point_PM25_CA_2012", #
+  pattern = "\\.csv$",
+  full.names = TRUE
+)
+
+# Get California point Data
+pointData <- lapply(fileList, function(file) {
+  f <- st_read(
+    file,
+    options = c(
+      "X_POSSIBLE_NAMES=Site.Longitude",
+      "Y_POSSIBLE_NAMES=Site.Latitude"
+    ),
+    crs = 4326 # Define o CRS como WGS84
+  )
+  return(f)
+})
+
+#  Get mean values
+#  Cada estação possuí várias medidas ao longo do ano, o que faremos é tirar a média de todas
+#  as medidas dentro de um ano, e então tirar a média de todos os anos, assim, cada estação
+#  terá apenas uma medida, que é a média total
+
+#  "Daily.Mean.PM2.5.Concentration", "Site.Latitude", "Site.Longitude"
+
+annual_means <- lapply(pointData, function(df) {
+  # Converter para numérico se necessário
+  if (!is.numeric(df$Daily.Mean.PM2.5.Concentration)) {
+    df$Daily.Mean.PM2.5.Concentration <- as.numeric(as.character(
+      df$Daily.Mean.PM2.5.Concentration
+    ))
+  }
+
+  # Calcular médias por estação
+  result <- df %>%
+    group_by(Site.Latitude, Site.Longitude, Site.ID) %>%
+    summarise(
+      Annual_Mean = mean(Daily.Mean.PM2.5.Concentration, na.rm = TRUE),
+      Count = sum(!is.na(Daily.Mean.PM2.5.Concentration)),
+      .groups = "drop"
+    )
+
+  # Converter para objeto sf com geometria
+  if (inherits(df, "sf")) {
+    result <- st_as_sf(
+      result,
+      coords = c("Site.Longitude", "Site.Latitude"),
+      crs = st_crs(df)
+    )
+  } else {
+    # Se não for objeto sf, criar geometria manualmente
+    result <- st_as_sf(
+      result,
+      coords = c("Site.Longitude", "Site.Latitude"),
+      crs = 4326 # WGS84 como sistema padrão
+    )
+  }
+
+  return(result)
+})
+
+all_stations <- do.call(rbind, annual_means)
+
+#  Get total mean
+pointData_df <- all_stations %>%
+  group_by(Site.ID) %>%
+  summarise(
+    mean = mean(Annual_Mean, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+```{r Join-spatial-data}
+# Filtra apenas polígonos com valor (sem NA)
+aereal_polygons <- aerealData_sf[!is.na(aerealData_sf$mean), ]
+
+# Faz interseção espacial com os pontos - Isso retorna apenas os pontos que estão dentro de algum polígono válido
+points_on_aereal <- st_join(pointData_df, aereal_polygons, join = st_within)
+
+# Remove pontos que não caíram em nenhum polígono (ou seja, ficaram com NA no join)
+points_on_aereal <- points_on_aereal[!is.na(points_on_aereal$mean.y), ]
+
+# Junta os dados selecionados
+mixedData <- bind_rows(
+  aerealData = select(aereal_polygons, mean, geometry),
+  pointData = select(points_on_aereal, mean = mean.x, geometry),
+  .id = "type"
+)
+
+sf <- st_transform(st_sf(mixedData$geometry), 4326)
+sf <- st_make_valid(sf)
+
+# plot(mixedData)
+```
+
+```{r Get-model cache=TRUE}
+n.partition <- 4
+n.blocks <- n.partition^2
+num.nb <- 2
+
+
+params = list(
+  a = 0,
+  b = 39.859
+)
+alpha <- 0.8
+
+
+# n <- nrow(sf)
+HGPdata <- get_HGPdata(
+  sf,
+  n.blocks,
+  num.nb,
+  priors = list(a=params$a, b=params$b),
+  alpha = alpha
+)
+
+y <- mixedData$mean[HGPdata$order]
+
+# View(mixedData)
+```
+
+```{r Run-INLA cache=TRUE}
+# 1. Organizar os dados
+data1 <- data.frame(y = mixedData$mean)
+data1$idx <- 1:nrow(data1)
+
+# 2. Modelo de efeito aleatório espacial
+f.spatial <- y ~ 1 + f(idx, model = HGPdata$model)
+
+M <- 50
+out <- matrix(NA, nrow = M, ncol = 4)
+names(out) <- c("beta", "sigma", "rho", "tau")
+
+for (i in 1:M) {
+  set.seed(i)
+  print(i)
+
+  # 3. Rodar INLA
+  resf <- inla(
+    f.spatial,
+    data = as.data.frame(data1),
+    family = "gaussian", # Distribuição Normal
+    # verbose = TRUE
+  )
+
+  # Theta1 = precision
+  tau.est <- inla.emarginal(
+    function(x) 1 / sqrt(x),
+    resf$marginals.hyperpar[[1]]
+  )
+
+  # Theta1 = (log(1/σ²))  ! supposed to be sigma not sigmasq?
+  sigmasq.est <- inla.emarginal(
+    function(x) exp(-x),
+    resf$marginals.hyperpar[[2]]
+  )
+  sigma.est <- sqrt(sigmasq.est)
+
+  # Theta2 = logit(ϕ) -> rho = log(10)^1/ν * τ
+  rho.est <- inla.emarginal(
+    function(x)
+      log(10)^(1 / (alpha)) * (params$a - (params$a - params$b) / (1 + exp(x))),
+    resf$marginals.hyperpar[[3]]
+  )
+
+  # Resultado transformado
+
+  # print(resf)
+
+  cat("β: ", resf$summary.fixed[1]$mean, "\n") # 5.605 (4.688, 6.449)
+  cat("ρ: ", rho.est, "\n") # 13.826 (7.817, 23.608)
+  cat("τ: ", tau.est, "\n") # 0.178 (0.073, 0.312)
+  cat("σ:", sigma.est, "\n") # 2.399 (2.024, 2.837)
+
+  out[i, ] <- c(resf$summary.fixed[1]$mean, sigmasq.est, rho.est, tau.est)
+}
+names(out) <- c("beta", "sigma", "rho", "tau")
+summary(out)
+```
+
+```{r Plot-mixed-data}
+ggplot() +
+  geom_sf(data = mixedData, aes(color = mean, fill = mean)) +
+  labs(title = "") +
+  theme_minimal()
+```
+
+```{r}
+# hist das dist.mat
+# Pega a dist max/2
+# paper do lucas como vai
+# ρ = log(10)^(1/ν)*φ -> b = phi
+
+# CRS: 4326 - Geográfico (não projetado). em °
+# CRS: 32611 - Projetado (Universal Transverse Mercator - UTM). em KM!
+
+sf_utm <- st_transform(sf, 32611) # UTM para a Califórnia
+coords.D <- st_distance(sf_utm, which = "Hausdorff") # Agora em metros
+rho <- max(coords.D) / 2
+phi <- rho / (log(10)^(1 / alpha))
+phi_km <- units::set_units(phi, "km")  # 39.859
+```

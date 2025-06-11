@@ -1,0 +1,184 @@
+```{r imports}
+rm(list = ls())
+
+library(tidyverse)
+library(units)
+library(dplyr)
+library(INLA)
+library(sf)
+
+source("blockNNGPrgeneric.R")
+source("utils.R")
+```
+
+```{r generate-data}
+n = 100
+pointData = data.frame(
+  x = runif(n, 0, 10),
+  y = runif(n, 0, 10)
+)
+points_sf = st_as_sf(pointData, coords = c("x", "y"), crs = 3857)
+
+
+# Criar a grade 1x1 sobre o bounding box
+bbox <- st_bbox(c(xmin = 0, ymin = 0, xmax = 10, ymax = 10), crs = st_crs(3857))
+grid <- st_make_grid(
+  st_as_sfc(bbox),
+  cellsize = c(0.25, 0.25),
+  square = TRUE
+)
+grid_sf <- st_sf(id = 1:length(grid), geometry = grid)
+
+sf = st_join(points_sf, grid_sf, join = st_within)
+```
+
+```{r set-params}
+B = c(1, 2)
+sigma.sq <- 1
+alpha <- 0.8
+rho <- 5
+tau.sq <- 0.1
+phi <- rho / (log(10)^(1 / alpha))
+
+priors = list(a = 0, b = 2.49)
+
+
+distMat <- st_distance(sf, which = "Hausdorff") |>
+  set_units("km") |>
+  drop_units() |>
+  as.matrix()
+
+# O efeito espacial vem de uma função de covariância espacial (como a exponencial ou Matérn), que define o "nível de semelhança" entre pontos próximos.
+correlationMat <- exp(-(distMat / phi)^alpha)
+diag(correlationMat) <- 1
+covarMat = sigma.sq * correlationMat
+
+D = chol(covarMat)
+```
+
+
+```{r get-model}
+n.partition <- 4
+n.blocks <- n.partition^2
+num.nb <- 2
+
+HGPdata <- get_HGPdata(
+  sf,
+  n.blocks,
+  num.nb,
+  priors = priors,
+  alpha = alpha
+)
+
+
+# sf <- sf[HGPdata$order, ]
+```
+
+
+```{r run-INLA}
+M <- 2
+out <- matrix(0, ncol = 5, nrow = M)
+results_list = list()
+
+porra = 0
+
+x <- as.matrix(cbind(1, rnorm(n))) # x = intercept, covariate
+for (i in 1:M) {
+  set.seed(i)
+  print(i)
+
+  w <- t(matrix(rnorm(n), ncol = (n)) %*% D)
+  y <- rnorm(n, x %*% B + w, sqrt(tau.sq)) ## y=B1+ x*B2 + w(spatial) + nugget
+  x = x[HGPdata$order, ]
+  y = y[HGPdata$order]
+
+  f.blockNNGP <- y ~ 1 + x + f(idx, model = HGPdata$model)
+  data1 <- data.frame(y = y, x = x[, 2])
+  data1$idx <- 1:nrow(data1)
+
+  resf <- inla(
+    f.blockNNGP,
+    data = as.data.frame(data1),
+    family = "gaussian"
+  )
+
+  tau.est <- inla.emarginal(
+    function(x) 1 / x,
+    resf$marginals.hyperpar[["Precision for the Gaussian observations"]]
+  )
+
+  # retrieve parameters from INLA
+  # Theta1 = (log(1/σ²))  ! supposed to be sigma not sigmasq?
+  sigmasq.est <- inla.emarginal(
+    function(x) exp(-x),
+    resf$marginals.hyperpar[["Theta1 for idx"]]
+  )
+
+  # Theta2 = logit(ϕ) -> rho = log(10)^1/ν * φ
+  # θ2 = logit((φ - a)/(b - a)) → φ = a + (b - a)·plogis(θ2)
+  phi.est <- inla.emarginal(
+    function(x) priors$a + (priors$b - priors$a) * plogis(x),
+    resf$marginals.hyperpar[["Theta2 for idx"]]
+  )
+
+  rho.est <- phi.est * (log(10))^(1 / alpha)
+
+  est.w <- resf$summary.random$idx$mean
+
+  # Resultado transformado
+  cat("beta:", resf$summary.fixed[, 1], "\n")
+  cat("tau:", tau.est, "\n")
+  cat("σ²:", sigmasq.est, "\n")
+  cat("rho :", rho.est, "\n")
+  cat("phi :", phi.est, "\n")
+
+  summary(resf)
+
+  out[i, ] <- c(resf$summary.fixed[, 1], sigmasq.est, rho.est, tau.est)
+
+  results_list[[i]] <- list(
+    beta = resf$summary.fixed,
+    sigmasq = sigmasq.est,
+    rho = rho.est,
+    w_mean = est.w
+  )
+}
+
+summary(out)
+```
+
+
+```{r plot}
+# sf$y <- y
+# sf$block <- HGPdata$blocks
+
+# # Plotar blocos coloridos
+# ggplot(st_geometry(sf)) +
+#   geom_sf(aes(fill = factor(sf$block)), color = "white", alpha = 0.8) +
+#   scale_fill_discrete(name = "Bloco") +
+#   labs(title = "Divisão Espacial em Blocos") +
+#   theme_minimal()
+
+# ggplot(sf) +
+#   geom_sf(aes(fill = y)) +
+#   scale_fill_viridis_c(name = "Casos Observados") +
+#   theme_minimal()
+
+# plot(sf)
+```
+
+```{r}
+# rho = max(distMat) / 2
+# phi = rho / (log(10)^(1 / alpha))
+```
+
+ -->
+
+
+- conferir o phi
+- estimqr tau 1/theta[1]
+
+
+
+
+rho = 4: 4.371 
