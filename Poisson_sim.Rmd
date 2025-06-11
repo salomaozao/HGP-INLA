@@ -11,6 +11,8 @@ library(mvtnorm)
 library(tidyverse)
 library(sf)
 library(units)
+require(Matrix)
+
 ```
 
 ```{r} set spatial parameters
@@ -18,6 +20,8 @@ sigma.sq <- 0.19
 rho <- 2.25
 alpha <- 0.7
 phi <- rho / (log(10)^(1 / alpha))
+B <- as.matrix(c(-0.2, 0.35))
+priors = list(a = 0, b = 10)
 ```
 
 ```{r}
@@ -25,23 +29,18 @@ library(CARBayesdata)
 data(GGHB.IZ)
 data(respiratorydata) # dados usados pelo Lucas
 
-sf <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]
-n <- nrow(sf)
 
+sf <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]
 distMatrix <- st_distance(sf, which = "Hausdorff") |>
   units::set_units(value = "km") |>
   units::set_units(value = NULL) |>
   as.matrix()
 
+n <- nrow(sf)
 R <- exp((-1) * (distMatrix / phi)^alpha)
 diag(R) <- 1
 C <- sigma.sq * R
-
 D <- chol(C)
-# set.seed(1232)
-
-B <- as.matrix(c(-0.2, 0.35))
-p <- length(B)
 
 X <- as.matrix(cbind(1, scale(respiratorydata$incomedep))) ## X = intercept + covariate
 E <- respiratorydata$expected # offset
@@ -58,6 +57,7 @@ HGPdata <- get_HGPdata(
   sf,
   n.blocks,
   num.nb,
+  priors = list(a = priors$a, b = priors$b),
   alpha = alpha
 )
 
@@ -66,55 +66,59 @@ blockNNGP.model <- HGPdata$model
 
 
 ```{r} Run model with INLA'
-M <- 100
+M <- 2
 out <- matrix(0, ncol = 4, nrow = M)
 
-Xnew <- X[(HGPdata$order), ]
-Enew <- E[(HGPdata$order)]
 
-# for(i in 1:M){
-# set.seed(i)
-# print(i)
-rnorm_n.obs <- rnorm(n)
-w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
+for (i in 1:M) {
+  set.seed(i)
+  print(i)
+  rnorm_n.obs <- rnorm(n)
 
-lambda <- E * exp(eta + w)
-# set.seed(102910)
-y <- rpois(n, lambda)
+  # (?) Por que aqui, geramos o efeito
+  w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
 
-y <- y[(HGPdata$order)]
-data1 <- data.frame(y = y, x = Xnew[, 2])
-data1$idx <- 1:nrow(data1)
+  lambda <- E * exp(eta + w)
 
-f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
+  y <- rpois(n, lambda)
+  y <- y[(HGPdata$order)]
+  Xnew <- X[(HGPdata$order), ]
+  Enew <- E[(HGPdata$order)]
 
-resf <- inla(
-  f.blockNNGP,
-  data = as.data.frame(data1),
-  family = "poisson",
-  E = Enew
-)
+  data1 <- data.frame(y = y, x = Xnew[, 2])
+  data1$idx <- 1:nrow(data1)
 
-# summary(resf)
+  f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
 
-# Theta1 = (log(1/σ²))  ! supposed to be sigma not sigmasq?
-sigmasq.est <- inla.emarginal(
-  function(x) exp(-x),
-  resf$marginals.hyperpar[[1]]
-)
+  resf <- inla(
+    f.blockNNGP,
+    data = as.data.frame(data1),
+    family = "poisson",
+    E = Enew
+  )
 
-# Theta2 = logit(ϕ) -> rho = log(10)^1/ν * φ
-rho.est <- inla.emarginal(
-  function(x) log(10)^(1 / (alpha)) * (10 - 10 / (1 + exp(x))),
-  resf$marginals.hyperpar[[2]]
-)
+  # summary(resf)
 
-# Resultado transformado
-cat("σ²:", sigmasq.est, "\n") # deve ser 0.19
-cat("ϕ :", rho.est, "\n") # deve ser 2.25
-summary(resf)
-# out[i,] <- c(resf$summary.fixed[,1],sigmasq.est,rho.est)
-# }
+  # Theta1 = (log(1/σ²))  ! supposed to be sigma not sigmasq?
+  sigmasq.est <- inla.emarginal(
+    function(x) exp(-x),
+    resf$marginals.hyperpar[[1]]
+  )
+
+  phi.est <- inla.emarginal(
+    function(x) priors$a + (priors$b - priors$a) * plogis(x),
+    resf$marginals.hyperpar[["Theta2 for idx"]]
+  )
+
+  rho.est <- phi.est * (log(10))^(1 / alpha)
+
+  # Resultado transformado
+  cat("σ²:", sigmasq.est, "\n") # deve ser 0.19
+  cat("ϕ :", rho.est, "\n") # deve ser 2.25
+  summary(resf)
+  out[i, ] <- c(resf$summary.fixed[, 1], sigmasq.est, rho.est)
+}
+
 ```
 
 
