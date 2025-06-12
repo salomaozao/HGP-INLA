@@ -21,6 +21,7 @@ rho <- 2.25
 alpha <- 0.7
 phi <- rho / (log(10)^(1 / alpha))
 B <- as.matrix(c(-0.2, 0.35))
+priors = list(a = 0, b = 10)
 ```
 
 ```{r}
@@ -56,7 +57,7 @@ HGPdata <- get_HGPdata(
   sf,
   n.blocks,
   num.nb,
-  priors = list(a = 0, b = 10),
+  priors = list(a = priors$a, b = priors$b),
   alpha = alpha
 )
 
@@ -65,58 +66,61 @@ blockNNGP.model <- HGPdata$model
 
 
 ```{r} Run model with INLA'
-M <- 100
+M <- 2
 out <- matrix(0, ncol = 4, nrow = M)
 
 
-# for(i in 1:M){
-# set.seed(i)
-# print(i)
-rnorm_n.obs <- rnorm(n)
+for (i in 1:M) {
+  set.seed(i)
+  print(i)
+  rnorm_n.obs <- rnorm(n)
 
-# (?) Por que aqui, geramos o efeito
-w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
+  # (?) Por que aqui, geramos o efeito
+  w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
 
-lambda <- E * exp(eta + w)
+  lambda <- E * exp(eta + w)
 
-y <- rpois(n, lambda)
-y <- y[(HGPdata$order)]
-Xnew <- X[(HGPdata$order), ]
-Enew <- E[(HGPdata$order)]
+  y <- rpois(n, lambda)
+  y <- y[(HGPdata$order)]
+  Xnew <- X[(HGPdata$order), ]
+  Enew <- E[(HGPdata$order)]
 
-data1 <- data.frame(y = y, x = Xnew[, 2])
-data1$idx <- 1:nrow(data1)
+  data1 <- data.frame(y = y, x = Xnew[, 2])
+  data1$idx <- 1:nrow(data1)
 
-f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
+  f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
 
-resf <- inla(
-  f.blockNNGP,
-  data = as.data.frame(data1),
-  family = "poisson",
-  E = Enew
-)
+  resf <- inla(
+    f.blockNNGP,
+    data = as.data.frame(data1),
+    family = "poisson",
+    E = Enew
+  )
 
-# summary(resf)
+  # summary(resf)
 
-# Theta1 = (log(1/σ²))  ! supposed to be sigma not sigmasq?
-sigmasq.est <- inla.emarginal(
-  function(x) exp(-x),
-  resf$marginals.hyperpar[[1]]
-)
+  # Theta1 = (log(1/σ²))  ! supposed to be sigma not sigmasq?
+  sigmasq.est <- inla.emarginal(
+    function(x) exp(-x),
+    resf$marginals.hyperpar[[1]]
+  )
 
-# Theta2 = logit(ϕ) -> rho = log(10)^1/ν * φ
-rho.est <- inla.emarginal(
-  function(x) log(10)^(1 / (alpha)) * (10 - 10 / (1 + exp(x))),
-  resf$marginals.hyperpar[[2]]
-)
+  phi.est <- inla.emarginal(
+    function(x) priors$b + (priors$b - priors$a) * plogis(x),
+    resf$marginals.hyperpar[["Theta2 for idx"]]
+  )
+
+  rho.est <- phi.est * (log(10))^(1 / alpha)
+
+  # Resultado transformado
+  cat("σ²:", sigmasq.est, "\n") # deve ser 0.19
+  cat("ϕ :", rho.est, "\n") # deve ser 2.25
+  summary(resf)
+  out[i, ] <- c(resf$summary.fixed[, 1], sigmasq.est, rho.est)
+}
 
 
-# Resultado transformado
-cat("σ²:", sigmasq.est, "\n") # deve ser 0.19
-cat("ϕ :", rho.est, "\n") # deve ser 2.25
-summary(resf)
-# out[i,] <- c(resf$summary.fixed[,1],sigmasq.est,rho.est)
-# }
+summary(out)
 ```
 
 
@@ -124,3 +128,7 @@ summary(resf)
 apply(out, 2, summary)
 boxplot(out)
 ```
+
+Caso poisson
+rho = 2.25: 3.155911
+rho = 3.25: 6.622937

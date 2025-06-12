@@ -36,7 +36,7 @@
     return(
       list(
         sigmasq = exp(-theta[1L]),
-        phi = b - (b - a) / (1 + exp(theta[2L]))
+        phi = b - (b - a) / (1 + exp(-theta[2L]))
       ) # b - (b-a)/(1+exp(theta2))
     )
   }

@@ -1,11 +1,6 @@
 TODO: 
-    Pegar caso da zaida e literalmente jogar pro nosso modelo
-    Fazer simulação para o caso de grid OK
-        O que tá errado nesse código caralho
-        
-    
-
-caso poisson está ok, logo modelo está ok
+- Entender de onde vem o theta    
+- Entender parametrização
 
 ***
     

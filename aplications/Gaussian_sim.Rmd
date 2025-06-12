@@ -12,7 +12,7 @@ source("utils.R")
 ```
 
 ```{r generate-data}
-n = 100
+n = 1000
 pointData = data.frame(
   x = runif(n, 0, 10),
   y = runif(n, 0, 10)
@@ -36,10 +36,9 @@ sf = st_join(points_sf, grid_sf, join = st_within)
 B = c(1, 2)
 sigma.sq <- 1
 alpha <- 0.8
-rho <- 5
+rho <- 4
 tau.sq <- 0.1
 phi <- rho / (log(10)^(1 / alpha))
-
 priors = list(a = 0, b = 2.49)
 
 
@@ -76,11 +75,9 @@ HGPdata <- get_HGPdata(
 
 
 ```{r run-INLA}
-M <- 2
-out <- matrix(0, ncol = 5, nrow = M)
+M <- 3
+out <- matrix(0, ncol = 2, nrow = M)
 results_list = list()
-
-porra = 0
 
 x <- as.matrix(cbind(1, rnorm(n))) # x = intercept, covariate
 for (i in 1:M) {
@@ -114,10 +111,8 @@ for (i in 1:M) {
     resf$marginals.hyperpar[["Theta1 for idx"]]
   )
 
-  # Theta2 = logit(ϕ) -> rho = log(10)^1/ν * φ
-  # θ2 = logit((φ - a)/(b - a)) → φ = a + (b - a)·plogis(θ2)
   phi.est <- inla.emarginal(
-    function(x) priors$a + (priors$b - priors$a) * plogis(x),
+    function(x) priors$b - (priors$b - priors$a) / (1 + exp(-x)),
     resf$marginals.hyperpar[["Theta2 for idx"]]
   )
 
@@ -132,17 +127,19 @@ for (i in 1:M) {
   cat("rho :", rho.est, "\n")
   cat("phi :", phi.est, "\n")
 
+  cat("rho real: ", rho, "\n")
   summary(resf)
 
-  out[i, ] <- c(resf$summary.fixed[, 1], sigmasq.est, rho.est, tau.est)
+  out[i, ] <- c(rho.est, phi.est)
 
-  results_list[[i]] <- list(
-    beta = resf$summary.fixed,
-    sigmasq = sigmasq.est,
-    rho = rho.est,
-    w_mean = est.w
-  )
+  # results_list[[i]] <- list(
+  #   beta = resf$summary.fixed,
+  #   sigmasq = sigmasq.est,
+  #   rho = rho.est,
+  #   w_mean = est.w
+  # )
 }
+
 
 summary(out)
 ```
@@ -172,13 +169,21 @@ summary(out)
 # phi = rho / (log(10)^(1 / alpha))
 ```
 
- -->
 
+rho real:  5 
+rho              phi       
+Min.   :4.328   Min.   :1.526  
+1st Qu.:4.346   1st Qu.:1.532  
+Median :4.365   Median :1.539  
+Mean   :4.379   Mean   :1.544  
+3rd Qu.:4.405   3rd Qu.:1.553  
+Max.   :4.446   Max.   :1.567  
 
-- conferir o phi
-- estimqr tau 1/theta[1]
-
-
-
-
-rho = 4: 4.371 
+rho real:  4 
+rho              phi       
+Min.   :4.329   Min.   :1.526  
+1st Qu.:4.361   1st Qu.:1.538  
+Median :4.393   Median :1.549  
+Mean   :4.419   Mean   :1.558  
+3rd Qu.:4.465   3rd Qu.:1.574  
+Max.   :4.536   Max.   :1.599  
