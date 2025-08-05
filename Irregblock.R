@@ -6,62 +6,59 @@
 #***** n.blocks = 2^2, 2^3,2^4,2^5,2^6,2^7
 #########################################################
 
-part_v = function(treenew, level_k, num_block, blocks, loc) {
-  k <- level_k[1]
-  vb <- treenew[k, ]$x
-  indblock <- which(loc[, 1] <= vb)
-  blocks[indblock] <- num_block[1]
-  blocks[-indblock] <- num_block[4]
-
-  k <- level_k[2]
-  hb <- treenew[k, ]$y
-  indblock1 <- which(loc[, 2] > hb)
-  indblock2 <- which(blocks == num_block[1])
-  indblock <- intersect(indblock1, indblock2)
-  blocks[indblock] <- num_block[2]
-
-  k <- level_k[3]
-  hb <- treenew[k, ]$y
-  indblock1 <- which(loc[, 2] < hb)
-  indblock2 <- which(blocks == num_block[4])
-  indblock <- intersect(indblock1, indblock2)
-  blocks[indblock] <- num_block[3]
-  return(blocks)
-}
-
-part_v2 = function(treenew, level_k, num_block, blocks, loc) {
-  k <- level_k[1]
-  vb <- treenew[k, ]$x
-  indblock1 <- which(loc[, 1] > vb)
-  indblock2 <- which(blocks == num_block[1])
-  indblock <- intersect(indblock1, indblock2)
-  blocks[indblock] <- num_block[2]
-
-  return(blocks)
-}
-
-
-part_h2 = function(treenew, level_k, num_block, blocks, loc) {
-  k <- level_k[1]
-  hb <- treenew[k, ]$y
-  indblock1 <- which(loc[, 2] > hb)
-  indblock2 <- which(blocks == num_block[1])
-  indblock <- intersect(indblock1, indblock2)
-  blocks[indblock] <- num_block[2]
-  return(blocks)
-}
-
-
 kdtree_blocks = function(treenew, n.blocks, loc) {
+  part_v = function(treenew, level_k, num_block, blocks) {
+    k <- level_k[1]
+    vb <- treenew[k, ]$x
+    indblock <- which(loc[, 1] <= vb)
+    blocks[indblock] <- num_block[1]
+    blocks[-indblock] <- num_block[4]
+
+    k <- level_k[2]
+    hb <- treenew[k, ]$y
+    indblock1 <- which(loc[, 2] > hb)
+    indblock2 <- which(blocks == num_block[1])
+    indblock <- intersect(indblock1, indblock2)
+    blocks[indblock] <- num_block[2]
+
+    k <- level_k[3]
+    hb <- treenew[k, ]$y
+    indblock1 <- which(loc[, 2] < hb)
+    indblock2 <- which(blocks == num_block[4])
+    indblock <- intersect(indblock1, indblock2)
+    blocks[indblock] <- num_block[3]
+    return(blocks)
+  }
+
+  part_v2 = function(treenew, level_k, num_block, blocks) {
+    k <- level_k[1]
+    vb <- treenew[k, ]$x
+    indblock1 <- which(loc[, 1] > vb)
+    indblock2 <- which(blocks == num_block[1])
+    indblock <- intersect(indblock1, indblock2)
+    blocks[indblock] <- num_block[2]
+
+    return(blocks)
+  }
+
+  part_h2 = function(treenew, level_k, num_block, blocks) {
+    k <- level_k[1]
+    hb <- treenew[k, ]$y
+    indblock1 <- which(loc[, 2] > hb)
+    indblock2 <- which(blocks == num_block[1])
+    indblock <- intersect(indblock1, indblock2)
+    blocks[indblock] <- num_block[2]
+    return(blocks)
+  }
+
   nexp = log(n.blocks) / log(2)
 
   # 4 blocks
-  n = nrow(loc)
   m = n.blocks / 4
   blocks <- matrix(NA, n, 1)
   level_k <- c(1, 2, 3)
   num_block <- c(1, m + 1, 2 * m + 1, 3 * m + 1)
-  blocks <- part_v(treenew, level_k, num_block, blocks, loc)
+  blocks <- part_v(treenew, level_k, num_block, blocks)
   sort(unique(blocks))
 
   if (nexp >= 3) {
@@ -69,89 +66,109 @@ kdtree_blocks = function(treenew, n.blocks, loc) {
     m <- 4
     k <- n.blocks / 4
     r <- k - 1
-    if (n.blocks == 8) t = 1
-    if (n.blocks == 16) t = 1
-    if (n.blocks == 32) t = 4
-    if (n.blocks == 64) t = 8
-    if (n.blocks == 128) t = 16
+    if (n.blocks == 8) {
+      t = 1
+    }
+    if (n.blocks == 16) {
+      t = 1
+    }
+    if (n.blocks == 32) {
+      t = 4
+    }
+    if (n.blocks == 64) {
+      t = 8
+    }
+    if (n.blocks == 128) {
+      t = 16
+    }
     for (i in 1:m) {
       level_k <- 3 + i
       num_block <- c((k * i - r), (k * i - r + t))
-      blocks <- part_v2(treenew, level_k, num_block, blocks, loc)
+      blocks <- part_v2(treenew, level_k, num_block, blocks)
     }
     sort(unique(blocks))
   }
 
   if (nexp >= 4) {
     # 16 blocks
-    if (n.blocks == 16) t = 2
-    if (n.blocks == 32) t = 2
-    if (n.blocks == 64) t = 4
-    if (n.blocks == 128) t = 8
+    if (n.blocks == 16) {
+      t = 2
+    }
+    if (n.blocks == 32) {
+      t = 2
+    }
+    if (n.blocks == 64) {
+      t = 4
+    }
+    if (n.blocks == 128) {
+      t = 8
+    }
     blocks1 <- sort(unique(blocks))
     m <- 8
     for (i in 1:m) {
       level_k <- c(7 + i)
       num_block <- c(blocks1[i], blocks1[i] + t)
-      blocks <- part_h2(treenew, level_k, num_block, blocks, loc)
+      blocks <- part_h2(treenew, level_k, num_block, blocks)
     }
     sort(unique(blocks))
   }
 
   if (nexp >= 5) {
     # 32 blocks
-    if (n.blocks == 32) t = 1
-    if (n.blocks == 64) t = 1
-    if (n.blocks == 128) t = 4
+    if (n.blocks == 32) {
+      t = 1
+    }
+    if (n.blocks == 64) {
+      t = 1
+    }
+    if (n.blocks == 128) {
+      t = 4
+    }
     blocks1 <- sort(unique(blocks))
     m <- 16
     for (i in 1:m) {
       level_k <- c(15 + i)
       num_block <- c(blocks1[i], blocks1[i] + t)
-      blocks <- part_v2(treenew, level_k, num_block, blocks, loc)
+      blocks <- part_v2(treenew, level_k, num_block, blocks)
     }
     sort(unique(blocks))
   }
 
   if (nexp >= 6) {
     # 64 blocks
-    if (n.blocks == 64) t = 2
-    if (n.blocks == 128) t = 2
+    if (n.blocks == 64) {
+      t = 2
+    }
+    if (n.blocks == 128) {
+      t = 2
+    }
     blocks1 <- sort(unique(blocks))
     m <- 32
     for (i in 1:m) {
       level_k <- c(31 + i)
       num_block <- c(blocks1[i], blocks1[i] + t)
-      blocks <- part_h2(treenew, level_k, num_block, blocks, loc)
+      blocks <- part_h2(treenew, level_k, num_block, blocks)
     }
     sort(unique(blocks))
   }
 
   if (nexp >= 7) {
     # 128 blocks
-    if (n.blocks == 128) t = 1
+    if (n.blocks == 128) {
+      t = 1
+    }
     blocks1 <- sort(unique(blocks))
     m <- 64
     for (i in 1:m) {
       level_k <- c(63 + i)
       num_block <- c(blocks1[i], blocks1[i] + t)
-      blocks <- part_v2(treenew, level_k, num_block, blocks, loc)
+      blocks <- part_v2(treenew, level_k, num_block, blocks)
     }
     sort(unique(blocks))
   }
 
   return(blocks)
 }
-
-#' k-d tree
-#' function from package Mathart in R
-#'
-#' Computes a k-d tree for a given set of points
-#' @param points A data frame with columns for x and y coordinates, and each point in a row. Refer to the \href{https://en.wikipedia.org/wiki/K-d_tree}{Wikipedia article} for details.
-#' @keywords k-d tree
-#' @export
-#' @examples
-#' kdtree()
 
 kdtree = function(points, minmax = FALSE) {
   n <- nrow(points)
@@ -249,4 +266,3 @@ kdtree = function(points, minmax = FALSE) {
   }
   df
 }
-###################################################
