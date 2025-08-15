@@ -109,7 +109,6 @@ Prec_NNGP <- function(loc, AdjMatrix, Sigma) {
 
 
 get_HGPdata = function(
-  loc,
   sf,
   y,
   X,
@@ -123,7 +122,6 @@ get_HGPdata = function(
     blocks <- NULL
     loc.blocks <- matrix(NA, n.blocks, 2)
     nb <- NULL # Pontos por bloco
-
     centroids = st_centroid(sf) # get centroids to sort the blocks
     centroids_coords = st_coordinates(centroids)
     points <- data.frame(x = centroids_coords[, 1], y = centroids_coords[, 2]) # Cria dataframe com coordenadas.
@@ -131,8 +129,32 @@ get_HGPdata = function(
     treenew <- tree[1:(n.blocks - 1), ] # cria subsets de kd-tree para dividir
     blocks <- kdtree_blocks(treenew, n.blocks, loc) # atribui pontos aos blocos
 
+    ###############
+
+    contagem_blocos <- as.data.frame(table(blocks)) %>%
+      arrange(as.numeric(as.character(blocks)))
+
+    colnames(contagem_blocos) <- c("Bloco", "Pontos")
+    print(contagem_blocos) #
+    # print(1:n.blocks)
+
+    print(which(blocks == 1))
+    # Poisson: > 13143, 13144, 13145, ...
+    # Gaussian: > 42, 163, 172, ...
+
+    print(length(blocks))
+    # Poisson: > 26465
+    # Gaussian: > 200
+
+    print(length(centroids_coords))
+    # Poisson: > 268
+    # Gaussian: > 400
+
+    ###############
+
     for (k in 1:n.blocks) {
       indblock <- which(blocks == k)
+      # print(indblock)
       loc.blocks[k, ] <- c(
         mean(centroids_coords[indblock, 1]),
         mean(centroids_coords[indblock, 2])
@@ -261,7 +283,7 @@ get_HGPdata = function(
     stop("sf is not a spatial data frame.")
   }
 
-  loc <- st_coordinates(sf)
+  loc <- st_coordinates(st_centroid(sf))
   block_struc = get_blocksdata(loc, sf, n.blocks, num.nb)
   ind1 = block_struc$ind1
   AdjMatrix = block_struc$AdjMatrix
