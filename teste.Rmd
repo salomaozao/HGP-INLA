@@ -1,0 +1,86 @@
+```{r}
+rm(list = ls())
+dir.save <- getwd()
+
+library(INLA)
+library(mvtnorm)
+library(tidyverse)
+library(sf)
+library(units)
+
+
+library(CARBayesdata)
+data(GGHB.IZ)
+data(respiratorydata)
+```
+
+```{r} set spatial parameters
+sigma.sq <- 0.19
+rho <- 2.25
+alpha <- 0.7
+phi <- rho / (log(10)^(1 / alpha))
+
+priors = list(a = 0, b = 2.432049)
+
+source("blockNNGPrgeneric.R")
+source("Irregblock.R")
+```
+
+```{r}
+sf <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]$geometry
+n <- nrow(sf)
+
+plot(sf)
+
+distMatrix <- st_distance(sf, which = "Hausdorff") |>
+  units::set_units(value = NULL) |>
+  as.matrix()
+
+R <- exp((-1) * (distMatrix / phi)^alpha)
+diag(R) <- 1
+C <- sigma.sq * R
+
+D <- chol(C)
+# set.seed(1232)
+
+B <- as.matrix(c(-0.2, 0.35))
+p <- length(B)
+
+X <- as.matrix(cbind(1, scale(respiratorydata$incomedep))) ## X = intercept + covariate
+
+E <- respiratorydata$expected # offset
+
+w <- t(matrix(rnorm(n), ncol = (n)) %*% D)
+eta <- X %*% B
+lambda <- E * exp(eta + w)
+y <- rpois(n, lambda)
+```
+
+
+```{r} Generate HGP model
+source("utils.R")
+n.partition <- 8
+n.blocks <- n.partition^2
+num.nb <- 2
+```
+
+
+
+```{r} get_blocksdata
+loc <- st_coordinates(st_centroid(sf)) # Erro aqui
+st_coordinates(sf)
+(sf)
+nloc <- dim(loc)[1]
+blocks <- NULL
+loc.blocks <- matrix(NA, n.blocks, 2)
+nb <- NULL # Pontos por bloco
+
+centroids = st_centroid(sf) # get centroids to sort the blocks
+centroids_coords = st_coordinates(centroids)
+points <- data.frame(x = centroids_coords[, 1], y = centroids_coords[, 2]) # Cria dataframe com coordenadas.
+tree <- kdtree(points) # Cria kd-tree
+treenew <- tree[1:(n.blocks - 1), ] # cria subsets de kd-tree para dividir
+blocks <- kdtree_blocks(treenew, n.blocks, loc) # atribui pontos aos blocos
+
+blocks
+```

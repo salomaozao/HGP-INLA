@@ -11,12 +11,12 @@ library(INLA)
 ```
 
 ```{r}
-n <- 300
+n <- 1000
 
 #  pass spatial parameters
 B <- as.matrix(c(1, 5))
-sigma.sq <- 1
 tau.sq <- 0.1
+sigma.sq <- 1
 phi <- 1 / 3
 alpha <- 1
 
@@ -26,7 +26,6 @@ n.blocks <- n.partition^2
 num.nb <- 2
 
 M <- 20
-out <- matrix(0, ncol = 4, nrow = M)
 
 ```
 
@@ -68,26 +67,23 @@ y <- rnorm(nloc, X %*% B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
 
 
 ```{r} Generate HGP model
-
 HGPdata <- get_HGPdata(sf, y, X, n.blocks, num.nb, alpha, priors)
 
 nb <- HGPdata$nb
 ind_obs1 <- HGPdata$ind_obs1
 indb <- HGPdata$indb
 coords.D <- HGPdata$coords.D
-
-
 ```
 
 ```{r} Run model with INLA
-blockNNGP.model <- HGPdata$model
-
 data1 <- data.frame(y = y, x = X[, 2])
 data1$idx <- 1:nrow(data1)
+blockNNGP.model <- HGPdata$model
 
 f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
 
 
+out <- matrix(0, ncol = 4, nrow = M)
 for (i in 1:M) {
   set.seed(i)
   print(i)
@@ -109,7 +105,9 @@ for (i in 1:M) {
   summary.theta <- c(tau.est, sigmasq.est, phi.est)
   print(c("tau.est", "sigmasq.est", "phi.est"))
   print(summary.theta)
-  out[i, ] <- c(resf$summary.fixed[, 1], sigmasq.est, phi.est)
+
+  print(resf$summary.fixed[, 1])
+  out[i, ] <- c(resf$summary.fixed[, 1], sigmasq.est, phi.est, tau.est)
 }
 print("CASO GAUSSIAN")
 summary(out)
