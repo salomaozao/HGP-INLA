@@ -1,0 +1,104 @@
+rm(list = ls())
+set.seed(1232)
+setwd("C:/Users/GabrielNascimento/Documents/Gabriel/IC/HGP-INLA")
+
+source("blockNNGPrgeneric.R")
+source("utils.R")
+
+library(tidyverse)
+library(sf)
+library(INLA)
+
+n <- 100
+
+#  pass spatial parameters
+B <- as.matrix(c(1, 5))
+tau.sq <- 0.1
+sigma.sq <- 1
+phi <- 1 / 3
+alpha <- 1
+
+priors = list(a = 0, b = 2.432049)
+n.partition <- 8
+n.blocks <- n.partition^2
+num.nb <- 2
+
+M <- 20
+
+
+loc <- cbind(runif(n, 0, 1), runif(n, 0, 1))
+colnames(loc) <- c("x", "y")
+
+sf <- st_as_sf(
+  as.data.frame(loc),
+  coords = c("x", "y"),
+  crs = 4326
+)
+loc <- st_coordinates(st_centroid(sf))
+
+
+# range <- log(10)^(1 / alpha) * phi
+
+distMatrix <- st_distance(sf, which = "Hausdorff") |>
+  units::set_units(value = NULL) |>
+  as.matrix()
+R <- exp((-1) * (distMatrix / phi)^alpha)
+
+
+diag(R) <- 1
+nloc <- dim(loc)[1]
+C <- sigma.sq * R
+
+D <- chol(C)
+rnorm_n.obs <- rnorm(n)
+w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
+
+X <- as.matrix(cbind(1, rnorm(nloc))) ## X = intercept + covariate
+
+p <- length(B)
+
+y <- rnorm(nloc, X %*% B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
+
+
+HGPdata <- get_HGPdata(sf, y, X, n.blocks, num.nb, alpha, priors)
+
+nb <- HGPdata$nb
+ind_obs1 <- HGPdata$ind_obs1
+indb <- HGPdata$indb
+coords.D <- HGPdata$coords.D
+
+data1 <- data.frame(y = y, x = X[, 2])
+data1$idx <- 1:nrow(data1)
+blockNNGP.model <- HGPdata$model
+
+f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
+
+
+out <- matrix(0, ncol = 4, nrow = M)
+for (i in 1:M) {
+  set.seed(i)
+  print(i)
+
+  resf <- inla(f.blockNNGP, data = as.data.frame(data1), family = "gaussian")
+
+  # Extraction of hyperparameters
+  tau.est <- inla.emarginal(function(x) 1 / x, resf$marginals.hyperpar[[1]])
+  sigmasq.est <- inla.emarginal(
+    function(x) exp(-x),
+    resf$marginals.hyperpar[[2]]
+  )
+  phi.est <- inla.emarginal(
+    function(x) 1 - 1 / (1 + exp(x)),
+    resf$marginals.hyperpar[[3]]
+  )
+  w.est <- resf$summary.random$idx$mean
+
+  summary.theta <- c(tau.est, sigmasq.est, phi.est)
+  print(c("tau.est", "sigmasq.est", "phi.est"))
+  print(summary.theta)
+
+  print(resf$summary.fixed[, 1])
+  out[i, ] <- c(resf$summary.fixed[, 1], sigmasq.est, phi.est, tau.est)
+}
+print("CASO GAUSSIAN")
+summary(out)
