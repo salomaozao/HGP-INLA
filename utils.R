@@ -1,4 +1,4 @@
-source("irregblock.R")
+source("Irregblock.R")
 
 
 ## blockNNGP and NNGP functions
