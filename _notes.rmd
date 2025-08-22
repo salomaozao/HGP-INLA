@@ -1,6 +1,0 @@
-- arrumar atribuição global em get_HGPdata
-- Arrumar parâmetros em get_HGPdata
-
-
-
-como funciona o processo de clusterização???
