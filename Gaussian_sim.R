@@ -1,4 +1,3 @@
-```{r} INIT
 rm(list = ls())
 set.seed(1232)
 setwd("C:/Users/GabrielNascimento/Documents/Gabriel/IC/HGP-INLA")
@@ -9,10 +8,8 @@ source("utils.R")
 library(tidyverse)
 library(sf)
 library(INLA)
-```
 
-```{r}
-n <- 100
+n <- 300
 
 #  pass spatial parameters
 B <- as.matrix(c(1, 5))
@@ -28,9 +25,7 @@ num.nb <- 2
 
 M <- 20
 
-```
 
-```{r} Generate point data
 loc <- cbind(runif(n, 0, 1), runif(n, 0, 1))
 colnames(loc) <- c("x", "y")
 
@@ -64,19 +59,14 @@ p <- length(B)
 
 y <- rnorm(nloc, X %*% B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
 
-```
 
-
-```{r} Generate HGP model
 HGPdata <- get_HGPdata(sf, y, X, n.blocks, num.nb, alpha, priors)
 
 nb <- HGPdata$nb
 ind_obs1 <- HGPdata$ind_obs1
 indb <- HGPdata$indb
 coords.D <- HGPdata$coords.D
-```
 
-```{r} Run model with INLA
 data1 <- data.frame(y = y, x = X[, 2])
 data1$idx <- 1:nrow(data1)
 blockNNGP.model <- HGPdata$model
@@ -84,7 +74,7 @@ blockNNGP.model <- HGPdata$model
 f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
 
 
-out <- matrix(0, ncol = 4, nrow = M)
+out <- matrix(0, ncol = 5, nrow = M)
 for (i in 1:M) {
   set.seed(i)
   print(i)
@@ -112,4 +102,3 @@ for (i in 1:M) {
 }
 print("CASO GAUSSIAN")
 summary(out)
-```
