@@ -1,5 +1,5 @@
 #########################################################
-#***** functions for clustering irregular blocks
+#***** functions for irregular blocks
 #***** with similar number of points on each block
 #***** treenew has the kd-tree of the set of locations
 #***** for now you can only set

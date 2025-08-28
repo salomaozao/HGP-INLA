@@ -8,8 +8,11 @@ source("utils.R")
 library(tidyverse)
 library(sf)
 library(INLA)
+require(Matrix)
 
-n <- 300
+# ======================================
+n <- 200
+M <- 2
 
 #  pass spatial parameters
 B <- as.matrix(c(1, 5))
@@ -19,12 +22,11 @@ phi <- 1 / 3
 alpha <- 1
 
 priors = list(a = 0, b = 2.432049)
-n.partition <- 8
-n.blocks <- n.partition^2
+# n.partition <- 8
+n.blocks <- 64
 num.nb <- 2
 
-M <- 20
-
+# ======================================
 
 loc <- cbind(runif(n, 0, 1), runif(n, 0, 1))
 colnames(loc) <- c("x", "y")

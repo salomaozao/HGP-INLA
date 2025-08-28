@@ -109,6 +109,7 @@ Prec_NNGP <- function(loc, AdjMatrix, Sigma) {
 
 
 get_HGPdata = function(
+  loc,
   sf,
   y,
   X,
