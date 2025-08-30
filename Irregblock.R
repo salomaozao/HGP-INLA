@@ -7,6 +7,7 @@
 #########################################################
 
 kdtree_blocks = function(treenew, n.blocks, loc) {
+  n <- nrow(loc)
   part_v = function(treenew, level_k, num_block, blocks) {
     k <- level_k[1]
     vb <- treenew[k, ]$x
@@ -54,7 +55,7 @@ kdtree_blocks = function(treenew, n.blocks, loc) {
   nexp = log(n.blocks) / log(2)
 
   # 4 blocks
-  m = n.blocks / 4 # (?)
+  m = n.blocks / 4
   blocks <- matrix(NA, n, 1)
   level_k <- c(1, 2, 3)
   num_block <- c(1, m + 1, 2 * m + 1, 3 * m + 1)

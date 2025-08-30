@@ -38,6 +38,8 @@
   }
   # the graph function represents the entries of the precision matrix that are non-zero. W  must be passed as a sparse matrix (as defined in package Matrix) and the returned matrix must be sparse too.
   graph <- function() {
+    require(Matrix)
+
     return(Diagonal(nrow(W), x = 1) + W)
   }
 

@@ -1,4 +1,4 @@
-source("Irregblock.R")
+source("irregblock.R")
 
 
 ## blockNNGP and NNGP functions
@@ -24,9 +24,13 @@ PrecblockNNGP <- function(nloc, n.blocks, Sigma, nb, ind_obs1, num1, indb) {
 
   Bstar_bi <- matrix(0, length(ind_obs1), nloc)
 
-  diag(Bstar_bi) <- 1
+  # diag(Bstar_bi) <- 1 # (?) erro?
+  # Bb[1:nb[1], ] <- Bstar_bi
+  indices_to_set <- cbind(1:length(ind_obs1), ind_obs1)
+  Bstar_bi[indices_to_set] <- 1
 
-  Bb[1:nb[1], ] <- Bstar_bi
+  Bb[1:nb[1], 1:nloc] <- Bstar_bi
+
   #    system.time(
   for (j in 2:n.blocks) {
     ress <- meancov_nn(
@@ -107,12 +111,24 @@ Prec_NNGP <- function(loc, AdjMatrix, Sigma) {
   return(invCs)
 }
 
+show_results = function(res) {
+  cat("\n--- Resultados da Análise Espacial ---\n")
+  cat("\nEfeitos Fixos:\n")
+  cat(round(beta.est, 4))
+  cat("\nHiperparâmetros Espaciais Estimados:\n")
+  cat(sprintf("  - Variância Espacial (σ²): %.4f\n", sigmasq.est))
+  cat(sprintf("  - Desvio Padrão Espacial (σ): %.4f\n", sqrt(sigmasq.est)))
+  cat(sprintf("  - Parâmetro de Alcance (ρ): %.4f\n", rho.est))
+  cat("\nCritérios de Ajuste do Modelo:\n")
+  cat(sprintf("  - DIC: %.2f\n", resf$dic$dic))
+  cat(sprintf("  - WAIC: %.2f\n", resf$waic$waic))
+  cat(sprintf("  - Tempo de execução (segundos): %.2f\n", exec_time["elapsed"]))
+  cat("-------------------------------------\n")
+}
 
 get_HGPdata = function(
-  loc,
   sf,
-  y,
-  X,
+
   n.blocks,
   num.nb,
   alpha = 1,
@@ -123,13 +139,13 @@ get_HGPdata = function(
     blocks <- NULL
     loc.blocks <- matrix(NA, n.blocks, 2)
     nb <- NULL # Pontos por bloco
+
     centroids = st_centroid(sf) # get centroids to sort the blocks
     centroids_coords = st_coordinates(centroids)
     points <- data.frame(x = centroids_coords[, 1], y = centroids_coords[, 2]) # Cria dataframe com coordenadas.
     tree <- kdtree(points) # Cria kd-tree
     treenew <- tree[1:(n.blocks - 1), ] # cria subsets de kd-tree para dividir
     blocks <- kdtree_blocks(treenew, n.blocks, loc) # atribui pontos aos blocos
-
     ###############
 
     contagem_blocos <- as.data.frame(table(blocks)) %>%
@@ -155,7 +171,6 @@ get_HGPdata = function(
 
     for (k in 1:n.blocks) {
       indblock <- which(blocks == k)
-      # print(indblock)
       loc.blocks[k, ] <- c(
         mean(centroids_coords[indblock, 1]),
         mean(centroids_coords[indblock, 2])
@@ -252,7 +267,7 @@ get_HGPdata = function(
 
     ## mask for precision-blockNNGP
 
-    coords.D <- st_distance(sf, which = "Hausdorff") |>
+    coords.D <- st_distance(st_centroid(sf), which = "Hausdorff") |>
       # units::set_units(value = "km") |>
       units::set_units(value = NULL) |>
       as.matrix()
@@ -285,14 +300,16 @@ get_HGPdata = function(
   }
 
   loc <- st_coordinates(st_centroid(sf))
+
+  print(n.blocks)
   block_struc = get_blocksdata(loc, sf, n.blocks, num.nb)
   ind1 = block_struc$ind1
   AdjMatrix = block_struc$AdjMatrix
   blocks <- block_struc$blocks
 
   # bad code?
-  y <<- y[(ind1$ix)]
-  X <<- X[(ind1$ix), ]
+  # y <- y[(ind1$ix)]
+  # X <- X[(ind1$ix), ]
   blocks <- blocks[(ind1$ix)]
   sf <- sf[(ind1$ix), ]
 
@@ -322,7 +339,9 @@ get_HGPdata = function(
       nb = precMatrixData$nb,
       ind_obs1 = precMatrixData$ind_obs1,
       indb = precMatrixData$indb,
-      coords.D = precMatrixData$coords.D
+      coords.D = precMatrixData$coords.D,
+      order = ind1$ix,
+      blocks = blocks
     )
   )
 }

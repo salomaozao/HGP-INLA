@@ -1,0 +1,160 @@
+```{r} INIT
+rm(list = ls())
+set.seed(1232)
+setwd(
+  "C:/Users/GabrielNascimento/Downloads/HGP-INLA-T2/HGP-INLA-T2"
+)
+
+source("blockNNGPrgeneric.R")
+source("utils.R")
+library(tidyverse)
+library(sf)
+library(INLA)
+
+library(CARBayesdata)
+data(GGHB.IZ)
+data(respiratorydata) # dados usados pelo Lucas
+```
+
+```{r} set spatial parameters
+sigma.sq <- 0.19
+rho <- 2.25
+alpha <- 0.7
+phi <- rho / (log(10)^(1 / alpha))
+
+priors = list(a = 0, b = 10)
+
+B <- as.matrix(c(-0.2, 0.35))
+
+n.partition <- 8
+n.blocks <- n.partition^2
+num.nb <- 2
+M <- 4
+
+```
+
+```{r}
+sf <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]
+
+loc = st_coordinates(st_centroid(sf))
+distMatrix <- st_distance(sf, which = "Hausdorff") |>
+  units::set_units(value = "km") |>
+  units::set_units(value = NULL) |>
+  as.matrix()
+
+n <- nrow(sf)
+R <- exp((-1) * (distMatrix / phi)^alpha)
+diag(R) <- 1
+C <- sigma.sq * R
+D <- chol(C)
+
+X <- as.matrix(cbind(1, scale(respiratorydata$incomedep))) ## X = intercept + covariate
+E <- respiratorydata$expected # offset
+eta <- X %*% B
+```
+
+
+```{r} Generate HGP model
+HGPdata <- get_HGPdata(sf, n.blocks, num.nb, alpha, priors)
+
+blockNNGP.model <- HGPdata$model
+```
+
+
+```{r} Run model with INLA'
+out <- matrix(0, ncol = 4, nrow = M)
+colnames(out) <- c("Intercepto", "Covariavel_x", "sigma.sq", "rho")
+
+
+for (i in 1:M) {
+  set.seed(i)
+  print(i)
+  rnorm_n.obs <- rnorm(n)
+
+  # (?) Por que aqui, geramos o efeito
+  w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
+
+  lambda <- E * exp(eta + w)
+
+  y <- rpois(n, lambda)
+  y <- y[(HGPdata$order)]
+  Xnew <- X[(HGPdata$order), ]
+  Enew <- E[(HGPdata$order)]
+
+  data1 <- data.frame(y = y, x = Xnew[, 2])
+  data1$idx <- 1:nrow(data1)
+
+  f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
+
+  resf <- inla(
+    f.blockNNGP,
+    data = as.data.frame(data1),
+    family = "poisson",
+    E = Enew
+  )
+
+  # summary(resf)
+
+  # Theta1 = (log(1/σ²))  ! supposed to be sigma not sigmasq?
+  sigmasq.est <- inla.emarginal(
+    function(x) exp(-x),
+    resf$marginals.hyperpar[[1]]
+  )
+
+  phi.est <- inla.emarginal(
+    function(x) 1 - 1 / (1 + exp(x)), # plogis(x)
+    resf$marginals.hyperpar[[2]]
+  )
+
+  rho.est <- phi.est * (log(10))^(1 / alpha)
+
+  # Resultado transformado
+  cat("σ²:", sigmasq.est, "\n") # deve ser 0.19
+  cat("ϕ :", rho.est, "\n") # deve ser 2.25
+  summary(resf)
+  # Armazenar resultados da simulação atual
+  out[i, ] <- c(resf$summary.fixed[, "mean"], sigmasq.est, rho.est)
+}
+
+
+summary(out)
+```
+
+
+```{r} Analyze output'
+# --- Output Descritivo dos Resultados ---
+
+# Valores verdadeiros para comparação
+true_values <- c(B[1], B[2], sigma.sq, rho)
+names(true_values) <- c("Intercepto", "Covariavel_x", "sigma.sq", "rho")
+
+# Calcular estatísticas descritivas das estimativas
+mean_estimates <- apply(out, 2, mean)
+sd_estimates <- apply(out, 2, sd)
+bias <- mean_estimates - true_values
+
+results_df <- data.frame(
+  Parâmetro = names(true_values),
+  Valor_Verdadeiro = true_values,
+  Media_Estimada = mean_estimates,
+  Desvio_Padrao_Estimado = sd_estimates,
+  Vies_Bias = bias
+)
+
+cat(
+  "--- Resultados da Simulação do Modelo Poisson (média de M=",
+  M,
+  " execuções) ---\n\n"
+)
+print(results_df, row.names = FALSE)
+
+
+# Gerar boxplots com linha de referência para o valor verdadeiro
+par(mfrow = c(2, 2))
+for (k in 1:ncol(out)) {
+  boxplot(out[, k], main = colnames(out)[k], ylab = "Valor Estimado")
+  # Adiciona uma linha pontilhada vermelha para o valor verdadeiro
+  abline(h = true_values[k], col = "red", lty = 2, lwd = 2)
+}
+par(mfrow = c(1, 1)) # Resetar layout do gráfico
+```
