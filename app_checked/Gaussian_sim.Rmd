@@ -2,7 +2,7 @@
 rm(list = ls())
 set.seed(1232)
 setwd(
-  "C:/Users/GabrielNascimento/Downloads/HGP-INLA-T2/HGP-INLA-T2"
+  "C:/Users/GabrielNascimento/Downloads/HGP-INLA-novo"
 )
 
 source("blockNNGPrgeneric.R")
@@ -13,7 +13,7 @@ library(INLA)
 ```
 
 ```{r}
-n <- 100
+n <- 1000
 
 #  pass spatial parameters
 sigma.sq <- 1
@@ -84,5 +84,6 @@ w.est <- resf$summary.random$idx$mean
 
 summary.theta <- c(tau.est, sigmasq.est, phi.est)
 print(c("tau.est", "sigmasq.est", "phi.est"))
+print(resf$summary.fixed)
 print(summary.theta)
 ```

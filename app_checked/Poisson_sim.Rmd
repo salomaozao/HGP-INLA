@@ -2,8 +2,9 @@
 rm(list = ls())
 set.seed(1232)
 setwd(
-  "C:/Users/GabrielNascimento/Downloads/HGP-INLA-T2/HGP-INLA-T2"
+  "C:/Users/GabrielNascimento/Downloads/HGP-INLA-novo"
 )
+
 
 source("blockNNGPrgeneric.R")
 source("utils.R")

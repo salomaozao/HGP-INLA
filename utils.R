@@ -112,6 +112,7 @@ Prec_NNGP <- function(loc, AdjMatrix, Sigma) {
 }
 
 show_results = function(res) {
+  rho.est <- phi.est * (log(10))^(1 / alpha)
   cat("\n--- Resultados da Análise Espacial ---\n")
   cat("\nEfeitos Fixos:\n")
   cat(round(beta.est, 4))
@@ -128,7 +129,6 @@ show_results = function(res) {
 
 get_HGPdata = function(
   sf,
-
   n.blocks,
   num.nb,
   alpha = 1,
@@ -155,15 +155,15 @@ get_HGPdata = function(
     print(contagem_blocos) #
     # print(1:n.blocks)
 
-    print(which(blocks == 1))
+    # print(which(blocks == 1))
     # Poisson: > 13143, 13144, 13145, ...
     # Gaussian: > 42, 163, 172, ...
 
-    print(length(blocks))
+    # print(length(blocks))
     # Poisson: > 26465
     # Gaussian: > 200
 
-    print(length(centroids_coords))
+    # print(length(centroids_coords))
     # Poisson: > 268
     # Gaussian: > 400
 
@@ -301,7 +301,7 @@ get_HGPdata = function(
 
   loc <- st_coordinates(st_centroid(sf))
 
-  print(n.blocks)
+  # print(n.blocks)
   block_struc = get_blocksdata(loc, sf, n.blocks, num.nb)
   ind1 = block_struc$ind1
   AdjMatrix = block_struc$AdjMatrix
@@ -342,6 +342,149 @@ get_HGPdata = function(
       coords.D = precMatrixData$coords.D,
       order = ind1$ix,
       blocks = blocks
+    )
+  )
+}
+
+
+#' @title Summarize a custom HGP model from an INLA object
+#'
+#' @description Extracts and formats key results, including parameter estimates,
+#'              95% credible intervals, and model fit statistics.
+#'
+#' @param resf A fitted model object from INLA.
+#' @param alpha The smoothness parameter (nu) used in the PEC function.
+#'              This is required to calculate the practical range rho.
+#' @param ci_level The desired level for the credible interval (e.g., 0.95 for 95%).
+#'
+#' @return A list containing the extracted parameter summaries and fit statistics.
+#'         The function also prints a formatted summary to the console.
+
+summarize_inla_hgp_CA <- function(resf, alpha, ci_level = 0.95) {
+  # --- Validação de Entradas ---
+  if (!inherits(resf, "inla")) {
+    stop("O objeto 'resf' não é um resultado válido da função INLA.")
+  }
+  if (missing(alpha)) {
+    stop(
+      "O argumento 'alpha' (parâmetro de suavidade nu) é obrigatório para calcular rho."
+    )
+  }
+
+  # --- Preparação ---
+  # Define os quantis para o intervalo de credibilidade
+  lower_q <- (1 - ci_level) / 2
+  upper_q <- 1 - lower_q
+  quants <- c(lower_q, 0.5, upper_q) # Inferior, Mediana, Superior
+
+  # --- 1. Efeitos Fixos (Intercepto) ---
+  beta_summary <- resf$summary.fixed[
+    "(Intercept)",
+    c("0.025quant", "mean", "0.975quant")
+  ]
+  # Usamos a média como estimativa pontual para consistência com summary()
+  beta_vals <- c(
+    beta_summary[["0.025quant"]],
+    beta_summary[["mean"]],
+    beta_summary[["0.975quant"]]
+  )
+
+  # --- 2. Hiperparâmetros ---
+  hyper_marginals <- resf$marginals.hyperpar
+
+  # Parâmetro 1: Tau (desvio padrão do erro de medição)
+  # O hiperparâmetro é a precisão (1/tau^2). A transformação é tau = 1/sqrt(precisão).
+  prec_obs_summary <- inla.qmarginal(quants, hyper_marginals[[1]])
+  tau_vals <- 1 / sqrt(prec_obs_summary)
+
+  # Parâmetro 2: Sigma^2 (variância do efeito espacial)
+  # O hiperparâmetro do rgeneric é log(1/sigma^2). A transformação é sigma^2 = exp(-log(1/sigma^2)).
+  log_inv_sigmasq_summary <- inla.qmarginal(quants, hyper_marginals[[2]])
+  sigmasq_vals <- exp(-log_inv_sigmasq_summary)
+
+  # Parâmetro 3: Phi (parâmetro base do alcance)
+  # O hiperparâmetro do rgeneric é logit(phi). A transformação é a logística (plogis).
+  logit_phi_summary <- inla.qmarginal(quants, hyper_marginals[[3]])
+  phi_vals <- plogis(logit_phi_summary)
+
+  # --- 3. Parâmetro Derivado (Rho - Alcance Prático) ---
+  rho_vals <- phi_vals * (log(10))^(1 / alpha)
+
+  # --- 4. Critérios de Ajuste ---
+  dic <- resf$dic$dic
+  waic <- resf$waic$waic
+  resf$waic
+  # LOOIC só está disponível se control.compute = list(loo = TRUE) foi usado
+  looic <- if (!is.null(resf$loo)) resf$loo$looic else NA
+
+  # --- 5. Tempo de Execução ---
+  cpu_time <- resf$cpu.used["Total"]
+
+  # --- Formatação da Saída ---
+  cat("\n--- Resumo do Modelo HGP via INLA ---\n")
+
+  cat("\nEFEITOS FIXOS\n")
+  cat(sprintf(
+    "  - Intercepto (β0):      %.4f (%.4f, %.4f)\n",
+    beta_vals[2],
+    beta_vals[1],
+    beta_vals[3]
+  ))
+
+  cat("\nHIPERPARÂMETROS\n")
+  cat(sprintf(
+    "  - D.P. do Erro (τ):       %.4f (%.4f, %.4f)\n",
+    tau_vals[2],
+    tau_vals[1],
+    tau_vals[3]
+  ))
+  cat(sprintf(
+    "  - Variância Espacial (σ²): %.4f (%.4f, %.4f)\n",
+    sigmasq_vals[2],
+    sigmasq_vals[1],
+    sigmasq_vals[3]
+  ))
+
+  cat("\nPARÂMETRO DE ALCANCE\n")
+  cat(sprintf(
+    "  - Alcance Prático (ρ):    %.4f (%.4f, %.4f)\n",
+    rho_vals[2],
+    rho_vals[1],
+    rho_vals[3]
+  ))
+
+  cat("\nCRITÉRIOS DE AJUSTE DO MODELO\n")
+  cat(sprintf("  - DIC:   %.2f\n", dic))
+  cat(sprintf("  - WAIC:  %.2f\n", waic))
+  cat(sprintf("  - LOOIC: %.2f\n", looic))
+
+  cat("\nTEMPO DE EXECUÇÃO\n")
+  cat(sprintf("  - Tempo total (CPU): %.2f segundos\n", cpu_time))
+  cat("-------------------------------------\n")
+
+  # --- Retorno dos Resultados (Opcional) ---
+  # Retorna uma lista para que os valores possam ser usados posteriormente
+  invisible(
+    list(
+      fixed_effects = data.frame(
+        median = beta_vals[2],
+        lower = beta_vals[1],
+        upper = beta_vals[3],
+        row.names = "beta0"
+      ),
+      hyperparameters = data.frame(
+        median = c(tau_vals[2], sigmasq_vals[2]),
+        lower = c(tau_vals[1], sigmasq_vals[1]),
+        upper = c(tau_vals[3], sigmasq_vals[3]),
+        row.names = c("tau", "sigma_sq")
+      ),
+      range_parameter = data.frame(
+        median = rho_vals[2],
+        lower = rho_vals[1],
+        upper = rho_vals[3],
+        row.names = "rho"
+      ),
+      fit_criteria = c(DIC = dic, WAIC = waic, LOOIC = looic)
     )
   )
 }
