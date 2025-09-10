@@ -1,18 +1,15 @@
-```{r} INIT
 rm(list = ls())
 set.seed(1232)
-setwd(
-  "C:/Users/GabrielNascimento/Downloads/HGP-INLA-novo"
-)
+# setwd(
+#   "/home/leste/GabrielNasc/HGP-INLA-novo"
+# )
 
 source("blockNNGPrgeneric.R")
 source("utils.R")
 library(tidyverse)
 library(sf)
 library(INLA)
-```
 
-```{r}
 n <- 300
 
 #  pass spatial parameters
@@ -26,9 +23,7 @@ n.partition <- 8
 n.blocks <- n.partition^2
 num.nb <- 2
 priors = list(a = 0, b = 2.432049)
-```
 
-```{r} Generate point data
 loc <- cbind(runif(n, 0, 1), runif(n, 0, 1))
 colnames(loc) <- c("x", "y")
 
@@ -54,19 +49,15 @@ w <- t(matrix(rnorm_n.obs, ncol = (n)) %*% D)
 p <- length(B)
 X <- as.matrix(cbind(1, rnorm(nloc))) ## X = intercept + covariate
 y <- rnorm(nloc, X %*% B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
-```
 
 
-```{r} Generate HGP model
 HGPdata <- get_HGPdata(sf, n.blocks, num.nb, alpha, priors)
 
 blockNNGP.model <- HGPdata$model
 order = HGPdata$order
 Xnew = X[order, ]
 ynew = y[order]
-```
 
-```{r} Run model with INLA
 data1 <- data.frame(y = ynew, x = Xnew[, 2])
 data1$idx <- 1:nrow(data1)
 
@@ -90,4 +81,5 @@ w.est <- resf$summary.random$idx$mean
 beta_summary <- resf$summary.fixed[,
   c("0.025quant", "mean", "0.975quant")
 ]
-```
+
+print(beta_summary)

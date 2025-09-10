@@ -12,7 +12,7 @@ library(INLA)
 ```
 
 ```{r}
-n <- 100
+n <- 400
 
 #  pass spatial parameters
 B <- as.matrix(c(1, 5))
@@ -68,48 +68,166 @@ y <- rnorm(nloc, X %*% B + w, sqrt(tau.sq)) ## y= X beta + w(spatial) + nugget
 
 
 ```{r} Generate HGP model
-HGPdata <- get_HGPdata(sf, y, X, n.blocks, num.nb, alpha, priors)
+HGPdata <- get_HGPdata(sf, n.blocks, num.nb, alpha, priors)
 
 nb <- HGPdata$nb
 ind_obs1 <- HGPdata$ind_obs1
 indb <- HGPdata$indb
 coords.D <- HGPdata$coords.D
+
+Xnew <- X[(HGPdata$order), ]
+ynew <- y[(HGPdata$order)]
+
 ```
 
 ```{r} Run model with INLA
-data1 <- data.frame(y = y, x = X[, 2])
-data1$idx <- 1:nrow(data1)
-blockNNGP.model <- HGPdata$model
+# -------------------------------------------------------------------------
+# BLOCO 5: EXECUTAR O MODELO E ARMAZENAR OS RESULTADOS DE CADA ITERAÇÃO
+# -------------------------------------------------------------------------
 
-f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
+# --- CORREÇÃO: Inicializar listas para guardar os resultados completos ---
+beta0_list <- list()
+beta1_list <- list()
+tau_list <- list() # <-- Adicionado para o desvio-padrão do erro (caso Gaussiano)
+sigmasq_list <- list()
+rho_list <- list()
+dic_list <- list()
+waic_list <- list()
+looic_list <- list()
+cpu_list <- list()
 
+# Definir os quantis que queremos extrair
+quants <- c(0.025, 0.5, 0.975)
 
-out <- matrix(0, ncol = 4, nrow = M)
+# Reordenar os dados (apenas uma vez, fora do loop)
+Xnew <- X[(HGPdata$order), ]
+ynew <- y[(HGPdata$order)]
+
 for (i in 1:M) {
   set.seed(i)
-  print(i)
+  print(paste("Executando iteração:", i))
 
-  resf <- inla(f.blockNNGP, data = as.data.frame(data1), family = "gaussian")
+  data1 <- data.frame(y = ynew, x = Xnew[, 2])
+  data1$idx <- 1:nrow(data1)
 
-  # Extraction of hyperparameters
-  tau.est <- inla.emarginal(function(x) 1 / x, resf$marginals.hyperpar[[1]])
-  sigmasq.est <- inla.emarginal(
-    function(x) exp(-x),
-    resf$marginals.hyperpar[[2]]
+  f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
+
+  resf <- inla(
+    f.blockNNGP,
+    data = as.data.frame(data1),
+    family = "gaussian", # <-- Família Gaussiana
+    # O offset 'E' não é usado na família Gaussiana, a menos que seja como um peso. Removendo para clareza.
+    control.compute = list(dic = TRUE, waic = TRUE, looic = TRUE)
   )
-  phi.est <- inla.emarginal(
-    function(x) 1 - 1 / (1 + exp(x)),
-    resf$marginals.hyperpar[[3]]
-  )
-  w.est <- resf$summary.random$idx$mean
 
-  summary.theta <- c(tau.est, sigmasq.est, phi.est)
-  print(c("tau.est", "sigmasq.est", "phi.est"))
-  print(summary.theta)
+  # --- CORREÇÃO: Extrair e armazenar os resultados completos da iteração 'i' ---
 
-  print(resf$summary.fixed[, 1])
-  out[i, ] <- c(resf$summary.fixed[, 1], sigmasq.est, phi.est, tau.est)
+  # Efeitos fixos
+  beta0_list[[i]] <- resf$summary.fixed[
+    "(Intercept)",
+    c("0.025quant", "mean", "0.975quant")
+  ]
+  beta1_list[[i]] <- resf$summary.fixed[
+    "x",
+    c("0.025quant", "mean", "0.975quant")
+  ]
+
+  # Hiperparâmetros
+  # No caso Gaussiano, a ordem geralmente é:
+  # 1. Precisão das observações (1/τ²)
+  # 2. Parâmetro de variância espacial (σ²)
+  # 3. Parâmetro de alcance espacial (ρ)
+  hyper_marginals <- resf$marginals.hyperpar
+
+  # D.P. do Erro (τ)
+  prec_summary <- inla.qmarginal(quants, hyper_marginals[[1]])
+  tau_list[[i]] <- 1 / sqrt(exp(prec_summary)) # Transformação de log(precisão) para desvio-padrão
+
+  # Variância Espacial (σ²)
+  log_inv_sigmasq_summary <- inla.qmarginal(quants, hyper_marginals[[2]])
+  sigmasq_list[[i]] <- exp(-log_inv_sigmasq_summary)
+
+  # Alcance Prático (ρ)
+  logit_phi_summary <- inla.qmarginal(quants, hyper_marginals[[3]])
+  phi_vals <- plogis(logit_phi_summary)
+  rho_list[[i]] <- phi_vals * (log(10))^(1 / alpha)
+
+  # Critérios de ajuste e tempo
+  dic_list[[i]] <- resf$dic$dic
+  waic_list[[i]] <- resf$waic$waic
+  looic_list[[i]] <- resf$loo$looic
+  cpu_list[[i]] <- resf$cpu.used["Total"]
 }
-print("CASO GAUSSIAN")
-summary(out)
+```
+
+
+```{r}
+# --------------------------------------------------------------------------
+# BLOCO 6: CALCULAR A MÉDIA DOS RESULTADOS E IMPRIMIR O RESUMO FINAL
+# --------------------------------------------------------------------------
+
+# --- CORREÇÃO: Calcular a média dos resultados de todas as M iterações ---
+avg_beta0 <- colMeans(do.call(rbind, beta0_list))
+avg_beta1 <- colMeans(do.call(rbind, beta1_list))
+avg_tau <- colMeans(do.call(rbind, tau_list))
+avg_sigmasq <- colMeans(do.call(rbind, sigmasq_list))
+avg_rho <- colMeans(do.call(rbind, rho_list))
+
+avg_dic <- mean(unlist(dic_list))
+avg_waic <- mean(unlist(waic_list))
+avg_looic <- mean(unlist(looic_list))
+avg_cpu <- mean(unlist(cpu_list))
+
+
+# --- Formatação da Saída (usando os valores médios) ---
+cat(
+  "\n--- Resumo Médio do Modelo HGP (",
+  M,
+  "iterações) - Caso Gaussiano ---\n"
+)
+
+cat("\nEFEITOS FIXOS (MÉDIA)\n")
+cat(sprintf(
+  "  - Intercepto (β0):      %.4f (%.4f, %.4f)\n",
+  avg_beta0[2],
+  avg_beta0[1],
+  avg_beta0[3]
+))
+
+cat(sprintf(
+  "  - Covariável (β1):      %.4f (%.4f, %.4f)\n",
+  avg_beta1[2],
+  avg_beta1[1],
+  avg_beta1[3]
+))
+
+cat("\nHIPERPARÂMETROS (MÉDIA)\n")
+cat(sprintf(
+  "  - D.P. do Erro (τ):       %.4f (%.4f, %.4f)\n", # <-- Adicionado para o caso Gaussiano
+  avg_tau[2],
+  avg_tau[1],
+  avg_tau[3]
+))
+cat(sprintf(
+  "  - Variância Espacial (σ²): %.4f (%.4f, %.4f)\n",
+  avg_sigmasq[2],
+  avg_sigmasq[1],
+  avg_sigmasq[3]
+))
+
+cat(sprintf(
+  "  - Alcance Prático (ρ):    %.4f (%.4f, %.4f)\n",
+  avg_rho[2],
+  avg_rho[1],
+  avg_rho[3]
+))
+
+cat("\nCRITÉRIOS DE AJUSTE DO MODELO (MÉDIA)\n")
+cat(sprintf("  - DIC:   %.2f\n", avg_dic))
+cat(sprintf("  - WAIC:  %.2f\n", avg_waic))
+cat(sprintf("  - LOOIC: %.2f\n", avg_looic))
+
+cat("\nTEMPO DE EXECUÇÃO (MÉDIA)\n")
+cat(sprintf("  - Tempo total (CPU): %.2f segundos\n", avg_cpu))
+cat("-----------------------------------------------------------\n")
 ```

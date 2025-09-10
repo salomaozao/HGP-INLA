@@ -1,3 +1,21 @@
+--- PARÂMETROS ESTIMADOS DO MODELO ---
+
+Efeitos Fixos (β):
+                  mean 0.025quant 0.975quant
+(Intercept) -0.2196752 -0.2576255 -0.1821968
+x            0.3313440  0.2936071  0.3694941
+
+Hiperparâmetros do Efeito Espacial (Estimativas Pontuais):
+  - Variância Espacial (σ²): 0.0345
+  - Alcance Prático (ρ):    1.6459
+
+--- CRITÉRIOS DE AJUSTE DO MODELO (Goodness of Fit) ---
+
+DIC:   1050.24
+WAIC:  1039.32
+LOOIC: NA
+---------------------------------------------------
+
 ```{r} INIT
 rm(list = ls())
 
@@ -19,11 +37,10 @@ data(respiratorydata)
 
 ```{r}
 n.partition <- 4
-n.blocks <- n.partition^2
+n.blocks <- 2^n.partition
 num.nb <- 2
 
 alpha <- 0.7
-priors = list(a = 0, b = 10)
 M = 3
 ```
 
@@ -33,12 +50,17 @@ sf <- GGHB.IZ[GGHB.IZ$IZ %in% respiratorydata$IZ, ]["geometry"]
 n <- nrow(sf)
 
 y <- respiratorydata$observed
+
+m = bind_cols(sf, y)
+plot(m)
 X <- as.matrix(cbind(1, scale(respiratorydata$incomedep))) ## X = intercept + covariate
 E <- respiratorydata$expected # offset
 ```
 
 
 ```{r} Generate HGP model
+priors = list(a = 0, b = max(st_distance(sf) / 2))
+
 HGPdata <- get_HGPdata(sf, n.blocks, num.nb, alpha, priors)
 
 y <- y[(HGPdata$order)]
@@ -56,65 +78,53 @@ data1$idx <- 1:nrow(data1)
 f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
 
 # ----------------------------------------------------
-exec_time = system.time({
-  resf <- inla(
-    f.blockNNGP,
-    data = as.data.frame(data1),
-    family = "poisson",
-    E = E,
-    # É uma boa prática adicionar este controle para calcular estatísticas de ajuste
-    control.compute = list(dic = TRUE, waic = TRUE)
-  )
-})
-# 3. Extrair e transformar os resultados
-# ----------------------------------------------------
-# Efeitos fixos (Intercepto e covariável)
-beta.est <- resf$summary.fixed[, "mean"]
-names(beta.est) <- rownames(resf$summary.fixed)
-
-# Variância do efeito espacial (sigma.sq)
-sigmasq.est <- inla.emarginal(
-  function(x) exp(-x),
-  resf$marginals.hyperpar[[1]]
+resf <- inla(
+  f.blockNNGP,
+  data = as.data.frame(data1),
+  family = "poisson",
+  E = E,
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
 )
 
-# Parâmetro de decaimento (phi)
-phi.est <- inla.emarginal(
-  function(x) 1 - 1 / (1 + exp(x)),
-  resf$marginals.hyperpar[[2]]
-)
-
-# Parâmetro de alcance espacial (rho)
-rho.est <- log(10)^(1 / alpha) * phi.est
-
-# Efeito espacial estimado para cada área
-est.w <- resf$summary.random$idx$mean
 ```
 
 
-```{r}
-# Adicionar informação dos blocos ao objeto sf
-sf$block <- HGPdata$blocks
-sf$y <- y
-centroids <- st_centroid(sf)
 
-
-# Plotar blocos coloridos
-ggplot(sf) +
-  geom_sf(aes(fill = factor(block)), color = "white", alpha = 0.8) +
-  scale_fill_discrete(name = "Bloco") +
-  labs(title = "Divisão Espacial em Blocos") +
-  theme_minimal()
-
-
-# Mapa de calor da variável y
-ggplot(sf) +
-  geom_sf(aes(fill = y), color = NA) +
-  scale_fill_viridis_c(name = "Casos Observados") +
-  labs(title = "Distribuição Espacial dos Casos de Doenças Respiratórias") +
-  theme_minimal()
-```
 
 ```{r}
-show_results(res)
+# --- Código Básico usando inla.qmarginal ---
+
+# Efeitos Fixos (Betas)
+beta0_interval <- inla.qmarginal(
+  c(0.025, 0.975),
+  resf$marginals.fixed[["(Intercept)"]]
+)
+beta1_interval <- inla.qmarginal(c(0.025, 0.975), resf$marginals.fixed[["x"]])
+
+# Alcance Prático (rho)
+rho_interval <- inla.qmarginal(
+  c(0.025, 0.975),
+  resf$marginals.hyperpar[1]
+)
+
+# Variância Espacial (sigma^2)
+sigma_marginal <- resf$marginals.hyperpar[2]
+sigma_sq_marginal <- inla.tmarginal(
+  fun = function(x) x^2,
+  marginal = sigma_marginal
+)
+sigma_sq_interval <- inla.qmarginal(c(0.025, 0.975), sigma_sq_marginal)
+
+# --- Exibir Resultados ---
+print("Intervalo para Intercepto (beta_0):")
+print(beta0_interval)
+
+print("Intervalo para Coeficiente (beta_1):")
+print(beta1_interval)
+
+print("Intervalo para Alcance Prático (rho):")
+print(rho_interval)
+
+print("Intervalo para Variância Espacial (sigma^2):")
+print(sigma_sq_interval)
 ```

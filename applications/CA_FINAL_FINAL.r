@@ -1,27 +1,29 @@
-# --- Resumo do Modelo HGP via INLA - caso Califórnia ---
+# --- Resumo do Modelo HGP via INLA ---
 
 # EFEITOS FIXOS
-#   - Intercepto (β0):      9.1453 (8.5192, 9.7728)
+#   - Intercepto (β0):      5.1296 (4.5549, 5.7050)
 
 # HIPERPARÂMETROS
-#   - D.P. do Erro (τ):       0.0082 (0.0263, 0.0034)
-#   - Variância Espacial (σ²): 16.1903 (20.2372, 13.0219)
+#   - D.P. do Erro (τ):       0.7640 (0.7819, 0.7467)
+#   - Variância Espacial (σ²): 1.5190 (1.6793, 1.3843)
 
 # PARÂMETRO DE ALCANCE
-#   - Alcance Prático (ρ):    0.0169 (0.0029, 0.0750)
+#   - Alcance Prático (ρ):    2.7565 (2.4956, 2.8274)
 
 # CRITÉRIOS DE AJUSTE DO MODELO
-#   - DIC:   -930.91
-#   - WAIC:  -964.50
+#   - DIC:   15918.22
+#   - WAIC:  22906.20
 #   - LOOIC: NA
 
 # TEMPO DE EXECUÇÃO
-#   - Tempo total (CPU): 14.06 segundos
+#   - Tempo total (CPU): 9926.73 segundos
 # -------------------------------------
+# --- Tabela Resumo por Bloco (Tamanho e Efeito Espacial) ---
 
 rm(list = ls())
-
 setwd("C:/Users/GabrielNascimento/Downloads/HGP-INLA-novo")
+
+# setwd("/home/leste/GabrielNasc/HGP-INLA-novo")
 # getwd()
 
 source("blockNNGPrgeneric.R")
@@ -32,7 +34,8 @@ library(terra)
 library(sf)
 library(rnaturalearth)
 library(dplyr)
-# library(ggplot2)
+library(ggplot2)
+library(patchwork) # Para combinar múltiplos gráficos
 library(tidyr)
 library(INLA)
 library(stats)
@@ -40,26 +43,28 @@ library(knitr)
 require(Matrix)
 
 alpha = 0.8
-n.partition <- 4
+n.partition <- 6
 n.blocks <- 2^n.partition
 num.nb <- 2
 
 # ======== Aereal data ========
 # Get world PM2.5 concentration
-world_data <- c(
-  rast("./CA_data/aereal_PM25_CA_2010/aereal_PM25_CA_2010.tif"),
-  rast("./CA_data/aereal_PM25_CA_2011/aereal_PM25_CA_2011.tif"),
-  rast("./CA_data/aereal_PM25_CA_2012/aereal_PM25_CA_2012.tif")
-)
+
+crs_proj = "EPSG:3310"
+# world_data <- c(
+#   rast("./CA_data/aereal_PM25_CA_2010/aereal_PM25_CA_2010.tif"),
+#   rast("./CA_data/aereal_PM25_CA_2011/aereal_PM25_CA_2011.tif"),
+#   rast("./CA_data/aereal_PM25_CA_2012/aereal_PM25_CA_2012.tif")
+# )
 # plot(world_data)
 
 # Get california shapefile
-shapefile <- ne_states(
-  country = "United States of America",
-  returnclass = "sf"
-)
+# shapefile <- ne_states(
+#   country = "United States of America",
+#   returnclass = "sf"
+# )
 
-shapefile <- shapefile[shapefile$name == "California", ]
+# shapefile <- shapefile[shapefile$name == "California", ]
 
 # ======== Point data ========
 fileList <- list.files(
@@ -76,17 +81,46 @@ pointData <- lapply(fileList, function(file) {
       "X_POSSIBLE_NAMES=Site.Longitude",
       "Y_POSSIBLE_NAMES=Site.Latitude"
     ),
-    crs = 4326
+    quiet = TRUE
   )
   return(f)
 })
 
+world_raster = terra::rast(
+  "./CA_data/global-annual-avg-pm2-5/PM25_201001_201212.tif"
+) |>
+  project(crs_proj)
 
-shapefile <- st_transform(shapefile, crs(world_data)) # sync CRS
-aerealData <- crop(world_data, shapefile) # crop to fit (?)
-aerealData <- mask(aerealData, shapefile) # mask shapefile with data
-aerealData <- mean(aerealData, na.rm = TRUE) # get mean
-aerealData_sf <- st_as_sf(as.polygons(aerealData$mean))
+CA_shp = st_read(
+  "./CA_data/ca_state/",
+  quiet = TRUE
+)
+# shapefile <- st_transform(CA_shp, crs(world_raster)) # sync CRS
+CA_shp = st_transform(CA_shp, crs = crs_proj)
+plot(CA_shp)
+# === Transformar em grid
+quad_tam = sqrt(101.95 * 10)
+# CA_raster = mask(world_raster, CA_shp)
+aereal_raster_proj <- mask(crop(world_raster, CA_shp), CA_shp)
+aereal_data <- as.polygons(aereal_raster_proj) %>%
+  st_as_sf() %>%
+  rename(mean = PM25_201001_201212)
+
+aereal_data_new = st_transform(aereal_data, "EPSG:3310")
+
+aereal_data_grid <- st_make_grid(aereal_data_new, cellsize = 10195) %>%
+  st_sf() %>%
+  st_intersection(aereal_data_new) %>%
+  st_cast("MULTIPOLYGON") %>%
+  mutate(id = row_number())
+
+
+plot(aereal_raster_proj)
+# ====
+
+plot(aereal_data_grid)
+
+aerealData_sf = aereal_data_grid
 #  ! use pipe operator
 
 #  Get mean values
@@ -127,7 +161,7 @@ annual_means <- lapply(pointData, function(df) {
 })
 
 
-all_stations <- do.call(rbind, annual_means)
+all_stations <- do.call(rbind, annual_means) |> st_transform(crs_proj)
 
 #  Get total mean
 pointData_df <- all_stations %>%
@@ -180,7 +214,7 @@ HGPdata <- get_HGPdata(
   n.blocks,
   num.nb,
   alpha = 0.8,
-  priors = list(a = 0, b = 796.88)
+  priors = list(a = 0, b = 796880)
 )
 
 
@@ -189,7 +223,7 @@ y <- mixedData$mean[HGPdata$order]
 # View(mixedData)
 
 # 1. Organizar os dados
-data1 <- data.frame(y = mixedData$mean)
+data1 <- data.frame(y = y)
 data1$idx <- 1:nrow(data1)
 
 # 2. Modelo de efeito aleatório espacial
@@ -202,7 +236,8 @@ exec.time = system.time({
     f.spatial,
     data = as.data.frame(data1),
     family = "gaussian",
-    control.compute = list(dic = TRUE, waic = TRUE)
+    control.compute = list(dic = TRUE, waic = TRUE),
+    verbose = TRUE
   )
 })
 
@@ -329,7 +364,6 @@ mapa_efeito_blocos <- ggplot(data = block_effect_sf) +
 print(mapa_efeito_blocos)
 # ======== VIZUALIZAÇÃO ========
 library(ggplot2)
-library(patchwork) # Para combinar múltiplos gráficos
 
 
 # 3. Adicionar as colunas do resultado do INLA, aplicando a reordenação
@@ -427,20 +461,37 @@ range_residuals <- range(results_df$residuals, na.rm = TRUE)
 # --- Mapa dos valores observados ---
 map_observed <- ggplot() +
   geom_sf(data = polygons_sf, aes(fill = mean), color = NA) +
-  geom_sf(data = points_sf, aes(color = mean), size = 2.5) +
+  geom_sf(
+    data = points_sf,
+    shape = 21,
+    aes(color = fitted_mean),
+    size = 2.5,
+    # color = "white",
+    stroke = 0.1
+  ) +
   scale_fill_viridis_c(option = "plasma", limits = range_observed) +
   scale_color_viridis_c(option = "plasma", limits = range_observed) +
   labs(title = "PM2.5 Observado", fill = "PM2.5", color = "PM2.5") +
   theme_void()
 
+
 # --- Mapa dos valores ajustados pelo modelo ---
 map_fitted <- ggplot() +
   geom_sf(data = polygons_sf, aes(fill = fitted_mean), color = NA) +
-  geom_sf(data = points_sf, aes(color = fitted_mean), size = 2.5) +
-  scale_fill_viridis_c(option = "plasma", limits = range_fitted) +
-  scale_color_viridis_c(option = "plasma", limits = range_fitted) +
-  labs(fill = "PM2.5", color = "PM2.5") +
+  geom_sf(
+    data = points_sf,
+    shape = 21,
+    aes(color = fitted_mean),
+    size = 2.5,
+    # color = "white",
+    stroke = 0.1
+  ) +
+  scale_fill_viridis_c(option = "plasma", limits = range_observed) +
+  scale_color_viridis_c(option = "plasma", limits = range_observed) +
+  labs(title = "PM2.5 Ajustado", fill = "PM2.5", color = "PM2.5") +
   theme_void()
+
+print(map_fitted | map_observed)
 
 # --- Mapa do Efeito Aleatório Espacial ---
 map_spatial_effect <- ggplot() +
@@ -469,34 +520,47 @@ map_spatial_effect <- ggplot() +
 
 # --- Mapa dos resíduos ---
 map_residuals <- ggplot() +
+  # Camada de polígonos (sem alteração)
   geom_sf(data = polygons_sf, aes(fill = residuals), color = NA) +
-  geom_sf(data = points_sf, aes(color = residuals), size = 2.5) +
+
+  # Camada de pontos (COM AS ALTERAÇÕES) ✅
+  geom_sf(
+    data = points_sf,
+    aes(fill = residuals), # MUDANÇA 1: Usamos 'fill' para a cor principal
+    size = 2.5,
+    shape = 21, # MUDANÇA 2: Usamos um shape que tem borda
+    color = "white", # MUDANÇA 3: A cor da borda é branca
+    stroke = 0.5 # MUDANÇA 4: A borda é fina (sutil/transparente)
+  ) +
+
+  # Escalas de cores (sem alteração, mas agora 'fill' controla a legenda dos pontos também)
   scale_fill_gradient2(
     low = "blue",
     mid = "white",
     high = "red",
     midpoint = 0,
-    limits = range_residuals
+    limits = range_residuals,
+    name = "Resíduo" # Unifica a legenda
   ) +
-  scale_color_gradient2(
-    low = "blue",
-    mid = "white",
-    high = "red",
-    midpoint = 0,
-    limits = range_residuals
-  ) +
+  # A escala de 'color' não é mais necessária para os pontos, mas podemos manter para consistência
+  # ou remover se não houver outras geometrias usando 'color'. Para simplificar, removemos.
+  # scale_color_gradient2(...)
+
   labs(
     title = "Resíduos (Observado - Ajustado)",
-    fill = "Resíduo",
-    color = "Resíduo"
+    fill = "Resíduo" # O título da legenda agora vem de 'fill'
   ) +
-  theme_void()
-
-
+  theme_void() +
+  # Remove a legenda de 'color' se ela for criada acidentalmente
+  guides(color = "none")
 print(plot_residuals_hist)
 print(plot_residuals_fit)
 
-print(map_observed | map_fitted) / (map_spatial_effect | map_residuals)
+print(map_observed | map_fitted)
+
+print(map_spatial_effect)
+print(map_residuals)
+
 
 plot_obs_vs_fit <- ggplot(results_df, aes(x = fitted_mean, y = mean)) +
   geom_point(alpha = 0.5, color = "dodgerblue") +
@@ -507,4 +571,77 @@ plot_obs_vs_fit <- ggplot(results_df, aes(x = fitted_mean, y = mean)) +
     y = "Observado"
   ) +
   theme_minimal()
-print(plot_obs_vs_fit)
+
+# 4. Calcular os resíduos (Observado - Ajustado)
+results_aereal = results_df |> filter(type == "aerealData")
+results_pt = results_df |> filter(type == "aerealData")
+
+# # --- Mapa dos valores ajustados pelo modelo ---
+# map_fitted_pt <- ggplot() +
+#   geom_sf(data = points_sf, aes(color = fitted_mean), size = 2.5) +
+#   scale_fill_viridis_c(option = "plasma", limits = range_fitted) +
+#   scale_color_viridis_c(option = "plasma", limits = range_fitted) +
+#   labs(
+#     title = "Valores ajustados",
+#     fill = "PM2.5",
+#     color = "PM2.5"
+#   ) +
+#   theme_void()
+# map_fitted_poly <- ggplot() +
+#   geom_sf(data = polygons_sf, aes(fill = fitted_mean), color = NA) +
+#   scale_fill_viridis_c(option = "plasma", limits = range_fitted) +
+#   scale_color_viridis_c(option = "plasma", limits = range_fitted) +
+#   labs(
+#     title = "Valores ajustados",
+#     fill = "PM2.5",
+#     color = "PM2.5"
+#   ) +
+#   theme_void()
+
+# map_residuals_pt <- ggplot() +
+#   geom_sf(data = points_sf, aes(color = residuals), size = 2.5) +
+#   scale_fill_gradient2(
+#     low = "blue",
+#     mid = "white",
+#     high = "red",
+#     midpoint = 0,
+#     limits = range_residuals
+#   ) +
+#   scale_color_gradient2(
+#     low = "blue",
+#     mid = "white",
+#     high = "red",
+#     midpoint = 0,
+#     limits = range_residuals
+#   ) +
+#   labs(
+#     title = "Resíduos (Observado - Ajustado)",
+#     fill = "Resíduo",
+#     color = "Resíduo"
+#   ) +
+#   theme_void()
+# map_residuals_poly <- ggplot() +
+#   geom_sf(data = polygons_sf, aes(fill = residuals), color = NA) +
+#   scale_fill_gradient2(
+#     low = "blue",
+#     mid = "white",
+#     high = "red",
+#     midpoint = 0,
+#     limits = range_residuals
+#   ) +
+#   scale_color_gradient2(
+#     low = "blue",
+#     mid = "white",
+#     high = "red",
+#     midpoint = 0,
+#     limits = range_residuals
+#   ) +
+#   labs(
+#     title = "Resíduos (Observado - Ajustado)",
+#     fill = "Resíduo",
+#     color = "Resíduo"
+#   ) +
+#   theme_void()
+
+# print(map_fitted_poly | map_residuals_poly)
+# print(map_fitted_pt | map_residuals_pt)

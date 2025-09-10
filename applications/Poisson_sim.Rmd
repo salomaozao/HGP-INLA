@@ -17,7 +17,7 @@ data(respiratorydata)
 
 ```{r} set spatial parameters
 M <- 20
-B <- as.matrix(c(-0.2, 0.35))
+B <- as.matrix(c(-0.21, 0.33))
 sigma.sq <- 0.19
 rho <- 2.25
 alpha <- 0.7
@@ -68,10 +68,10 @@ b = max(D) / 2
 priors = list(a = 0, b = b)
 
 
-n.partition <- 8
-n.blocks <- n.partition^2
+n.partition <- 4
+n.blocks <- 2^n.partition
 num.nb <- 2
-HGPdata <- get_HGPdata(sf, y, X, n.blocks, num.nb, alpha, priors)
+HGPdata <- get_HGPdata(sf, n.blocks, num.nb, alpha, priors)
 
 
 blockNNGP.model <- HGPdata$model
@@ -79,17 +79,33 @@ blockNNGP.model <- HGPdata$model
 
 
 ```{r} Run model with INLA'
-out <- matrix(0, ncol = 4, nrow = M)
+# -------------------------------------------------------------------------
+# BLOCO 5: EXECUTAR O MODELO E ARMAZENAR OS RESULTADOS DE CADA ITERAÇÃO
+# -------------------------------------------------------------------------
 
-# Xnew <- X[(HGPdata$order), ]
-# Enew <- E[(HGPdata$order)]
-# y <- y[(HGPdata$order)]
+# --- CORREÇÃO: Inicializar listas para guardar os resultados completos ---
+beta0_list <- list()
+beta1_list <- list()
+sigmasq_list <- list()
+rho_list <- list()
+dic_list <- list()
+waic_list <- list()
+looic_list <- list()
+cpu_list <- list()
+
+# Definir os quantis que queremos extrair
+quants <- c(0.025, 0.5, 0.975)
+
+# Reordenar os dados (apenas uma vez, fora do loop)
+Xnew <- X[(HGPdata$order), ]
+Enew <- E[(HGPdata$order)]
+ynew <- y[(HGPdata$order)]
 
 for (i in 1:M) {
   set.seed(i)
-  print(i)
+  print(paste("Executando iteração:", i))
 
-  data1 <- data.frame(y = y, x = X[, 2])
+  data1 <- data.frame(y = ynew, x = Xnew[, 2])
   data1$idx <- 1:nrow(data1)
 
   f.blockNNGP <- y ~ 1 + x + f(idx, model = blockNNGP.model)
@@ -98,31 +114,100 @@ for (i in 1:M) {
     f.blockNNGP,
     data = as.data.frame(data1),
     family = "poisson",
-    E = E
+    E = Enew,
+    # Adicionado para garantir que DIC/WAIC/LOOIC sejam calculados
+    control.compute = list(dic = TRUE, waic = TRUE, looic = TRUE)
   )
 
-  # summary(resf)
+  # --- CORREÇÃO: Extrair e armazenar os resultados completos da iteração 'i' ---
 
-  sigmasq.est <- inla.emarginal(
-    function(x) exp(-x),
-    resf$marginals.hyperpar[[1]]
-  )
-  phi.est <- inla.emarginal(
-    function(x) 1 - 1 / (1 + exp(x)),
-    resf$marginals.hyperpar[[2]]
-  )
-  rho.est <- log(10)^(1 / (alpha)) * phi.est
+  # Efeitos fixos
+  beta0_list[[i]] <- resf$summary.fixed[
+    "(Intercept)",
+    c("0.025quant", "mean", "0.975quant")
+  ]
+  beta1_list[[i]] <- resf$summary.fixed[
+    "x",
+    c("0.025quant", "mean", "0.975quant")
+  ]
 
-  # Resultado transformado
-  cat("σ²:", sigmasq.est, "\n")
-  cat("ϕ:", phi.est, "\n")
-  cat("ρ:", rho.est, "\n")
-  summary(resf)
-  names(out) = c("B1", "B2", "sigmasq.est", "phi.est")
-  out[i, ] <- c(resf$summary.fixed[, 1], sigmasq.est, phi.est)
+  # Hiperparâm etros
+  hyper_marginals <- resf$marginals.hyperpar
+
+  log_inv_sigmasq_summary <- inla.qmarginal(quants, hyper_marginals[[1]])
+  sigmasq_list[[i]] <- exp(-log_inv_sigmasq_summary)
+
+  logit_phi_summary <- inla.qmarginal(quants, hyper_marginals[[2]])
+  phi_vals <- plogis(logit_phi_summary)
+  rho_list[[i]] <- phi_vals * (log(10))^(1 / alpha)
+
+  # Critérios de ajuste e tempo
+  dic_list[[i]] <- resf$dic$dic
+  waic_list[[i]] <- resf$waic$waic
+  looic_list[[i]] <- resf$loo$looic
+  cpu_list[[i]] <- resf$cpu.used["Total"]
 }
 
-print("CASO POISSON")
-summary(out)
+```
 
+
+
+```{r}
+# --------------------------------------------------------------------------
+# BLOCO 6: CALCULAR A MÉDIA DOS RESULTADOS E IMPRIMIR O RESUMO FINAL
+# --------------------------------------------------------------------------
+
+# --- CORREÇÃO: Calcular a média dos resultados de todas as M iterações ---
+avg_beta0 <- colMeans(do.call(rbind, beta0_list))
+avg_beta1 <- colMeans(do.call(rbind, beta1_list))
+avg_sigmasq <- colMeans(do.call(rbind, sigmasq_list))
+avg_rho <- colMeans(do.call(rbind, rho_list))
+
+avg_dic <- mean(unlist(dic_list))
+avg_waic <- mean(unlist(waic_list))
+avg_looic <- mean(unlist(looic_list))
+avg_cpu <- mean(unlist(cpu_list))
+
+
+# --- Formatação da Saída (usando os valores médios) ---
+cat("\n--- Resumo Médio do Modelo HGP (", M, "iterações) ---\n")
+
+cat("\nEFEITOS FIXOS (MÉDIA)\n")
+cat(sprintf(
+  "  - Intercepto (β0):      %.4f (%.4f, %.4f)\n",
+  avg_beta0[2], # Média das médias
+  avg_beta0[1], # Média dos quantis inferiores
+  avg_beta0[3] # Média dos quantis superiores
+))
+
+cat(sprintf(
+  "  - Covariável (β1):      %.4f (%.4f, %.4f)\n",
+  avg_beta1[2],
+  avg_beta1[1],
+  avg_beta1[3]
+))
+
+cat("\nHIPERPARÂMETROS DO CAMPO ESPACIAL (MÉDIA)\n")
+cat(sprintf(
+  "  - Variância Espacial (σ²): %.4f (%.4f, %.4f)\n",
+  avg_sigmasq[2],
+  avg_sigmasq[1],
+  avg_sigmasq[3]
+))
+
+cat(sprintf(
+  "  - Alcance Prático (ρ):    %.4f (%.4f, %.4f)\n",
+  avg_rho[2],
+  avg_rho[1],
+  avg_rho[3]
+))
+
+cat("\nCRITÉRIOS DE AJUSTE DO MODELO (MÉDIA)\n")
+cat(sprintf("  - DIC:   %.2f\n", avg_dic))
+cat(sprintf("  - WAIC:  %.2f\n", avg_waic))
+cat(sprintf("  - LOOIC: %.2f\n", avg_looic))
+
+cat("\nTEMPO DE EXECUÇÃO (MÉDIA)\n")
+cat(sprintf("  - Tempo total (CPU): %.2f segundos\n", avg_cpu))
+cat("--------------------------------------------\n")
 ```

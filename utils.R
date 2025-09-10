@@ -186,16 +186,16 @@ get_HGPdata = function(
       blocks[indi] <- i
     }
 
-    if (n.blocks %in% c(8, 16)) {
-      indr <- 4
-    }
-    if (n.blocks %in% c(32, 64)) {
-      indr <- 8
-    }
-    if (n.blocks == 128) {
-      indr <- 16
-    }
-
+    # if (n.blocks %in% c(8, 16)) {
+    #   indr <- 4
+    # }
+    # if (n.blocks %in% c(32, 64)) {
+    #   indr <- 8
+    # }
+    # if (n.blocks == 128) {
+    #   indr <- 16
+    # }
+    indr = sqrt(n.blocks)
     indexsort1 <- NULL
 
     for (j in 1:(n.blocks / indr)) {
@@ -290,7 +290,8 @@ get_HGPdata = function(
         ind_obs1 = ind_obs1,
         num1 = num1,
         indb = indb,
-        coords.D = coords.D
+        coords.D = coords.D,
+        Q = invCsp
       )
     )
   }
@@ -341,7 +342,8 @@ get_HGPdata = function(
       indb = precMatrixData$indb,
       coords.D = precMatrixData$coords.D,
       order = ind1$ix,
-      blocks = blocks
+      blocks = blocks,
+      Q = precMatrixData$Q
     )
   )
 }
